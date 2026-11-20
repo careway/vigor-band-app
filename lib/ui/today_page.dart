@@ -42,7 +42,9 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
     final c = VC.of(context); final r = widget.repo; final keys = r.dayKeys;
     if (keys.isEmpty) {
       return EmptyState(Icons.watch_outlined, r.conn == 'connected' ? 'Sincronizando… aún no hay datos guardados.' : 'Conecta la pulsera para ver tus datos.',
-          action: FilledButton(onPressed: r.conn == 'connected' ? r.sync : r.connectSaved, child: Text(r.conn == 'connected' ? 'Sincronizar' : 'Conectar')));
+          action: FilledButton(
+              onPressed: r.conn == 'connected' ? r.sync : (r.savedMac != null ? r.connectSaved : () => showFindBandSheet(context, r)),
+              child: Text(r.conn == 'connected' ? 'Sincronizar' : (r.savedMac != null ? 'Conectar' : 'Buscar pulsera'))));
     }
     final k = (key != null && keys.contains(key)) ? key! : keys.last;
     final d = r.days[k]!; final isLast = k == keys.last;
@@ -286,4 +288,31 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
   }
 
   String _f(dynamic v, int dec) => v is num ? v.toStringAsFixed(dec) : '—';
+}
+
+
+/// Hoja de búsqueda de pulsera: escanea, lista lo encontrado y conecta al tocar. Detiene la búsqueda al cerrarse.
+Future<void> showFindBandSheet(BuildContext context, VigorRepo r) async {
+  r.scan();
+  await showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true, builder: (ctx) => ListenableBuilder(listenable: r, builder: (ctx, _) {
+    final c = VC.of(ctx); final found = r.found.values.toList();
+    return SafeArea(child: ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .7), child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4), children: [
+      Text('Buscar pulsera', style: VT.heading(c)),
+      const SizedBox(height: Sp.x2),
+      Semantics(liveRegion: true, child: Text(
+        r.conn == 'connecting' ? 'Conectando…' : r.conn == 'connected' ? 'Conectada.' : found.isEmpty ? (r.conn == 'scanning' ? 'Buscando pulseras cercanas…' : (r.logs.isNotEmpty ? r.logs.first : 'No se ha encontrado ninguna pulsera.')) : 'Toca tu pulsera para conectar:',
+        style: VT.body(c).copyWith(color: c.muted))),
+      const SizedBox(height: Sp.x2),
+      if (r.conn == 'scanning' && found.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: Sp.x3), child: LinearProgressIndicator()),
+      for (final d in found) Padding(padding: const EdgeInsets.only(bottom: Sp.x2), child: Glass(padding: EdgeInsets.zero, child: ListTile(
+        minVerticalPadding: 12,
+        leading: const Icon(Icons.watch_outlined),
+        title: Text(d['name'].toString().isEmpty ? '(sin nombre)' : d['name'].toString()),
+        subtitle: Text('${maskMac(d['mac']?.toString())} · ${d['rssi']} dBm'),
+        onTap: () async { await r.connect(d['mac'].toString()); if (ctx.mounted) Navigator.of(ctx).pop(); }))),
+      if (r.conn != 'scanning' && r.conn != 'connecting') Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: r.scan, icon: const Icon(Icons.refresh), label: const Text('Buscar de nuevo'))),
+      const Note('Acerca la pulsera al móvil y activa el Bluetooth. En Android 11 o anterior hace falta tener la ubicación activada solo para esta búsqueda.'),
+    ])));
+  }));
+  try { await r.stopScan(); } catch (_) {}
 }
