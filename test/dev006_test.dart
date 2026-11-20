@@ -27,6 +27,9 @@ void main() {
     test('hosts y esquema', () {
       expect(allowedUri(Uri.parse('https://github.com/a/b')), isTrue);
       expect(allowedUri(Uri.parse('https://objects.githubusercontent.com/x')), isTrue);
+      expect(allowedUri(Uri.parse('https://release-assets.githubusercontent.com/x')), isTrue);
+      expect(allowedUri(Uri.parse('https://evil.githubusercontent.com/x')), isFalse);
+      expect(allowedUri(Uri.parse('https://githubusercontent.com.evil.com/x')), isFalse);
       expect(allowedUri(Uri.parse('http://github.com/a')), isFalse);
       expect(allowedUri(Uri.parse('https://evil.com/github.com')), isFalse);
       expect(allowedUri(Uri.parse('https://github.com.evil.com/x')), isFalse);

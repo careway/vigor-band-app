@@ -11,7 +11,7 @@ const kUpdateUrl = 'https://api.github.com/repos/careway/vigor-band-app/releases
 /// Página de versiones para descargar a mano si la comprobación automática no es posible.
 const kReleasesPage = 'https://github.com/careway/vigor-band-app/releases/tag/latest';
 const kApkAsset = 'vigor-latest.apk';
-const kAllowedHosts = {'github.com', 'objects.githubusercontent.com', 'api.github.com'};
+const kAllowedHosts = {'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com', 'api.github.com'};
 /// Separación mínima entre comprobaciones (al iniciar y en cada resume): anti-spam.
 const kCheckEvery = Duration(minutes: 15);
 const kMaxApkBytes = 200 * 1024 * 1024;
@@ -28,7 +28,7 @@ int? parseBuild(String? body) {
   return m == null ? null : int.tryParse(m.group(1)!);
 }
 
-/// Solo https y los hosts de GitHub (la descarga redirige a objects.githubusercontent.com).
+/// Solo https y los hosts de GitHub (la descarga redirige a objects.githubusercontent.com o release-assets.githubusercontent.com).
 bool allowedUri(Uri u) => u.scheme == 'https' && kAllowedHosts.contains(u.host.toLowerCase()) && (!u.hasPort || u.port == 443);
 
 /// Interpreta la respuesta de la API de releases. null si no tiene el formato esperado.
