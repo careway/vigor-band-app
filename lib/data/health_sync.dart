@@ -96,6 +96,9 @@ class HealthSource {
   const HealthSource(this.days, this.nights, this.sessions, this.resting);
 }
 
+/// Tope de escrituras densas por ronda (Health Connect limita las peticiones por hora).
+const kMaxDensePerRun = 400;
+
 class HealthSync extends ChangeNotifier {
   HealthSync({required this.gateway, required this.savePref, required this.loadLedger, required this.saveLedger, DateTime Function()? clock, this.batch = 25}) : clock = clock ?? DateTime.now;
   final HealthGateway gateway;
@@ -330,8 +333,13 @@ class HealthSync extends ChangeNotifier {
       if (avail != HealthAvail.ready || !HealthCat.values.any(effective)) { state = avail != HealthAvail.ready ? HealthState.unavailable : (master ? HealthState.needsPermission : HealthState.off); if (state == HealthState.needsPermission) message ??= 'Faltan permisos en ${gateway.platformName}.'; return; }
       final src = source!();
       var errors = 0;
+      // Lo poco y valioso va primero (sueño, ejercicios): Health Connect limita las escrituras por hora y,
+      // si lo denso (pasos/pulso cada 5 o 1 min) agota la cuota, lo último se rechazaba siempre.
+      if (!_cancel && master) errors += await _sendSleep(src);
+      if (!_cancel && master) errors += await _sendSessions(src);
+      var dense = 0, denseStop = false;
       for (final st in _streams(src)) {
-        if (_cancel || !master) break;
+        if (_cancel || !master || denseStop) break;
         if (!effective(st.cat) || !gateway.supports(st.type)) continue;
         final wm = ((_ledger['wm'] as Map)[st.id] as num?)?.toInt();
         final floor = clock().subtract(const Duration(days: kDenseBackfillDays)).millisecondsSinceEpoch;
@@ -342,15 +350,14 @@ class HealthSync extends ChangeNotifier {
           if (it.start.millisecondsSinceEpoch <= from && (wm != null || it.start.millisecondsSinceEpoch < floor)) continue;
           if (wm != null && it.start.millisecondsSinceEpoch <= wm) continue;
           bool ok; try { ok = await gateway.write(it); } catch (_) { ok = false; }
-          if (!ok) { errors++; _fail(st.cat); break; } // no se avanza la marca: se reintenta en la siguiente sincronización
+          if (!ok) { errors++; _fail(st.cat); denseStop = true; break; } // cuota agotada u otro rechazo: no se insiste con el resto; no se avanza la marca: se reintenta en la siguiente sincronización
           catLastOk[st.cat] = '${_dm(it.start)} ${_hm(it.start)}';
           (_ledger['wm'] as Map)[st.id] = it.start.millisecondsSinceEpoch; _ledger['first'] ??= it.start.millisecondsSinceEpoch;
           lastCount++; n++;
           if (n % batch == 0) { await Future<void>.delayed(Duration.zero); }
+          if (++dense >= kMaxDensePerRun) { denseStop = true; break; } // tope por ronda; continúa en la siguiente
         }
       }
-      if (!_cancel && master) errors += await _sendSessions(src);
-      if (!_cancel && master) errors += await _sendSleep(src);
       ranOnce = true; totalSent += lastCount; _ledger['total'] = totalSent;
       if (lastCount > 0 || errors == 0) { last = clock(); _ledger['last'] = last!.millisecondsSinceEpoch; }
       await _persist();

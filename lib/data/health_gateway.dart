@@ -53,7 +53,8 @@ class PlatformHealthGateway implements HealthGateway {
     } catch (_) { return HealthAvail.unsupported; }
   }
 
-  List<HealthDataType> _types(Set<HType> ts) => [for (final t in ts) if (_map(t) != null) _map(t)!];
+  // Un ejercicio con calorías escribe también un registro de calorías totales: en Android hace falta ese permiso además del de ejercicio.
+  List<HealthDataType> _types(Set<HType> ts) => [for (final t in ts) if (_map(t) != null) _map(t)!, if (!isIos && ts.contains(HType.workout)) HealthDataType.TOTAL_CALORIES_BURNED];
   List<HealthDataAccess> _w(int n) => List.filled(n, HealthDataAccess.WRITE);
 
   @override
