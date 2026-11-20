@@ -81,7 +81,11 @@ class _CatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VC.of(context); final on = h.cats[cat] == true; final perm = h.granted[cat] == true;
     final dep = cat == HealthCat.route && h.cats[HealthCat.exercise] != true;
-    final sub = '${cat.sends}${on && !perm ? '\nFalta el permiso del sistema.' : ''}${dep ? '\nSe necesita activar «Ejercicio».' : ''}';
-    return Panel(padding: EdgeInsets.zero, child: SwitchListTile(title: Text(cat.title, style: VT.heading(c)), subtitle: Text(sub, style: VT.caption(c)), value: on, onChanged: (v) => h.setCat(cat, v)));
+    final sub = '${cat.sends}\n${h.catStatus(cat)}';
+    return Panel(padding: EdgeInsets.zero, child: Column(children: [
+      SwitchListTile(title: Text(cat.title, style: VT.heading(c)), subtitle: Text(sub, style: VT.caption(c)), value: on, onChanged: (v) => h.setCat(cat, v)),
+      if (on && h.master) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(left: Sp.x4, bottom: Sp.x2),
+        child: TextButton(onPressed: h.running || dep || !perm ? null : () { h.retryCat(cat); }, style: TextButton.styleFrom(minimumSize: const Size(48, 48)), child: Text(cat == HealthCat.sleep ? 'Reintentar sueño' : 'Reenviar ${cat.title.toLowerCase()}')))),
+    ]));
   }
 }

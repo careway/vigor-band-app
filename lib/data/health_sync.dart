@@ -70,6 +70,8 @@ abstract class HealthGateway {
   Future<bool> hasPermissions(Set<HType> types);
   Future<bool> requestPermissions(Set<HType> types);
   Future<bool> write(HealthItem it);
+  /// Causa corta (sin datos personales) del último fallo de escritura, o null.
+  String? get lastError;
   /// Devuelve el identificador del ejercicio escrito (null si falló).
   Future<String?> writeWorkout(WorkoutOut w);
   Future<bool> writeRoute(String workoutId, List<RoutePoint> pts);
@@ -103,6 +105,11 @@ class HealthSync extends ChangeNotifier {
   HealthState state = HealthState.off;
   String? message; DateTime? last; int lastCount = 0, totalSent = 0, pendingHint = 0;
   bool _running = false, _cancel = false;
+  /// Diagnóstico por categoría: último error real y último dato enviado (texto corto, sin coordenadas ni datos personales).
+  final catError = <HealthCat, String>{}; final catLastOk = <HealthCat, String>{};
+  /// Noches disponibles / válidas en el último envío (para distinguir «no hay noches» de «pendiente»).
+  int nightsSeen = 0, nightsValid = 0; bool ranOnce = false;
+  void _fail(HealthCat c) { catError[c] = gateway.lastError ?? 'el sistema rechazó la escritura (sin detalle)'; }
   HealthAvail? avail;
   Map<String, dynamic> _ledger = _fresh();
   bool _ledgerLoaded = false;
@@ -111,6 +118,41 @@ class HealthSync extends ChangeNotifier {
   static Map<String, dynamic> _fresh() => {'v': kHealthLedgerVersion, 'wm': <String, dynamic>{}, 'sessions': <String, dynamic>{}, 'routes': <String, dynamic>{}, 'sleep': <String, dynamic>{}};
 
   bool get running => _running;
+
+  static const _meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  static String _dm(DateTime t) => '${t.day} ${_meses[t.month - 1]}';
+  static String _hm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  /// Estado legible de una categoría para la pantalla.
+  String catStatus(HealthCat c) {
+    if (!master) return 'Compartir desactivado.';
+    if (cats[c] != true) return 'Desactivada.';
+    if (avail != null && avail != HealthAvail.ready) return 'No disponible: ${_availMsg()}';
+    if (granted[c] != true) return 'Sin permiso del sistema.';
+    if (c == HealthCat.route && cats[HealthCat.exercise] != true) return 'Necesita activar «Ejercicio».';
+    final e = catError[c]; if (e != null) return 'Error al escribir: $e';
+    final ok = catLastOk[c];
+    if (c == HealthCat.sleep) {
+      if (ok != null) return 'Última noche enviada: $ok';
+      if (ranOnce && nightsValid == 0) return nightsSeen == 0 ? 'No hay noches de sueño para enviar.' : 'Hay $nightsSeen noche(s) pero ninguna con hora de inicio y fin válidas.';
+      return 'Pendiente: se enviará en el próximo envío.';
+    }
+    return ok != null ? 'Último dato enviado: $ok' : (ranOnce ? 'Nada nuevo que enviar.' : 'Pendiente: se enviará en el próximo envío.');
+  }
+
+  /// Vuelve a enviar una categoría desde cero (borra sus marcas locales; en Health Connect el id estable evita duplicados).
+  Future<void> retryCat(HealthCat c) async {
+    if (_running) return;
+    catError.remove(c);
+    final wm = _ledger['wm'] as Map;
+    for (final st in _streamIds[c] ?? const <String>[]) { wm.remove(st); }
+    if (c == HealthCat.sleep) (_ledger['sleep'] as Map).clear();
+    if (c == HealthCat.exercise) (_ledger['sessions'] as Map).clear();
+    if (c == HealthCat.route) (_ledger['routes'] as Map).clear();
+    notifyListeners();
+    await run();
+  }
+  static const _streamIds = {HealthCat.activity: ['steps', 'dist', 'kcal'], HealthCat.heart: ['hr', 'hrv', 'rest'], HealthCat.oxygen: ['spo2'], HealthCat.temperature: ['temp']};
   bool get enabledAny => master && HealthCat.values.any(effective);
   /// Una categoría envía solo si el maestro, su interruptor y el permiso del sistema lo permiten (y, la ruta, también «Ejercicio»).
   bool effective(HealthCat c) => master && cats[c] == true && granted[c] == true && (c != HealthCat.route || (cats[HealthCat.exercise] == true && granted[HealthCat.exercise] == true));
@@ -234,7 +276,7 @@ class HealthSync extends ChangeNotifier {
   /// Envía lo nuevo. No lanza excepciones ni bloquea la UI (cede el turno cada [batch] datos).
   Future<void> run() async {
     if (_running || !master || source == null) return;
-    _running = true; _cancel = false; state = HealthState.running; message = null; lastCount = 0; notifyListeners();
+    catError.clear(); _running = true; _cancel = false; state = HealthState.running; message = null; lastCount = 0; notifyListeners();
     try {
       await _loadLedger();
       await refreshPermissions();
@@ -253,7 +295,8 @@ class HealthSync extends ChangeNotifier {
           if (it.start.millisecondsSinceEpoch <= from && (wm != null || it.start.millisecondsSinceEpoch < floor)) continue;
           if (wm != null && it.start.millisecondsSinceEpoch <= wm) continue;
           bool ok; try { ok = await gateway.write(it); } catch (_) { ok = false; }
-          if (!ok) { errors++; break; } // no se avanza la marca: se reintenta en la siguiente sincronización
+          if (!ok) { errors++; _fail(st.cat); break; } // no se avanza la marca: se reintenta en la siguiente sincronización
+          catLastOk[st.cat] = '${_dm(it.start)} ${_hm(it.start)}';
           (_ledger['wm'] as Map)[st.id] = it.start.millisecondsSinceEpoch; _ledger['first'] ??= it.start.millisecondsSinceEpoch;
           lastCount++; n++;
           if (n % batch == 0) { await Future<void>.delayed(Duration.zero); }
@@ -261,7 +304,7 @@ class HealthSync extends ChangeNotifier {
       }
       if (!_cancel && master) errors += await _sendSessions(src);
       if (!_cancel && master) errors += await _sendSleep(src);
-      totalSent += lastCount; _ledger['total'] = totalSent;
+      ranOnce = true; totalSent += lastCount; _ledger['total'] = totalSent;
       if (lastCount > 0 || errors == 0) { last = clock(); _ledger['last'] = last!.millisecondsSinceEpoch; }
       await _persist();
       if (errors > 0) { state = HealthState.error; message = 'Algunos datos no se pudieron enviar a ${gateway.platformName}; se reintentará en la próxima sincronización.'; }
@@ -275,14 +318,17 @@ class HealthSync extends ChangeNotifier {
     if (!effective(HealthCat.sleep) || !gateway.supports(HType.sleep)) return 0;
     var errors = 0; final sent = _ledger['sleep'] as Map;
     final floor = clock().subtract(const Duration(days: kSessionBackfillDays));
+    nightsSeen = src.nights.length; nightsValid = 0;
     for (final n in src.nights.reversed) {
       if (_cancel || !master || !effective(HealthCat.sleep)) break;
       final s = n.down, e = n.up;
       if (s == null || e == null || !e.isAfter(s) || s.isBefore(floor) || n.total <= 0) continue;
+      nightsValid++;
       final ver = e.millisecondsSinceEpoch ~/ 60000;
-      if (sent[n.date] == ver) continue;
-      bool ok; try { ok = await gateway.write(HealthItem(HType.sleep, HealthCat.sleep, 'vigor-sleep-${n.date}', s, e, n.total.toDouble(), version: ver.toDouble())); } catch (_) { ok = false; }
-      if (!ok) { errors++; break; }
+      if (sent[n.date] == ver) { catLastOk.putIfAbsent(HealthCat.sleep, () => '${_dm(s)} ${_hm(s)}–${_hm(e)}'); continue; }
+      bool ok; try { ok = await gateway.write(HealthItem(HType.sleep, HealthCat.sleep, 'vigor-sleep-${n.date}', s, e, n.total.toDouble(), version: ver.toDouble())); } catch (x) { ok = false; _ledger['lastEx'] = x.runtimeType.toString(); }
+      if (!ok) { errors++; _fail(HealthCat.sleep); break; }
+      catError.remove(HealthCat.sleep); catLastOk[HealthCat.sleep] = '${_dm(s)} ${_hm(s)}–${_hm(e)}';
       sent[n.date] = ver; _ledger['first'] ??= s.millisecondsSinceEpoch; lastCount++;
     }
     return errors;
@@ -301,14 +347,16 @@ class HealthSync extends ChangeNotifier {
       if (id == null && effective(HealthCat.exercise)) {
         final w = WorkoutOut(s.key, sportName(s.sportType), s.sportType, s.start, end, s.meters, s.kcal.round());
         String? r; try { r = await gateway.writeWorkout(w); } catch (_) { r = null; }
-        if (r == null || r.isEmpty) { errors++; break; }
+        if (r == null || r.isEmpty) { errors++; _fail(HealthCat.exercise); break; }
+        catError.remove(HealthCat.exercise); catLastOk[HealthCat.exercise] = '${_dm(s.start)} ${_hm(s.start)}';
         sent[s.key] = r; id = r; _ledger['first'] ??= s.start.millisecondsSinceEpoch; lastCount++;
       }
       if (id != null && wantRoute && effective(HealthCat.route) && routes[s.key] != true) {
         final pts = routePointsOf(s.route, s.start, end);
         if (pts.length >= 2) {
           bool ok; try { ok = await gateway.writeRoute(id, pts); } catch (_) { ok = false; }
-          if (!ok) { errors++; continue; }
+          if (!ok) { errors++; _fail(HealthCat.route); continue; }
+          catError.remove(HealthCat.route); catLastOk[HealthCat.route] = '${_dm(s.start)} ${_hm(s.start)}';
           routes[s.key] = true; lastCount++;
         } else { routes[s.key] = true; }
       }

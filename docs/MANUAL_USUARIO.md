@@ -69,6 +69,7 @@ En **Ajustes → Salud y compartir** puedes enviar tus datos de la pulsera a Hea
 - El envío es automático tras cada sincronización, solo con lo nuevo (los primeros días, hasta 7 días de datos y 30 de ejercicios y sueño). Apagar una categoría detiene su envío al momento. Verás el estado y el **último envío**.
 - **Dejar de compartir** apaga todo; no revoca permisos ni borra lo ya enviado. Para eso: ajustes de Health Connect (botón en la pantalla) o **Borrar lo que Vigor envió**, que pide confirmación y solo puede borrar lo que escribió Vigor. En iPhone: app Salud → Compartir → Apps → Vigor.
 - Health Connect viene integrado en Android 14 o superior; en Android 13 o inferior hay que instalar la app de Google Play. Vigor necesita Android 8 o superior.
+- Cada categoría muestra su estado (última noche o dato enviado, pendiente, sin permiso, error al escribir con la causa, sin datos) y un botón para **reenviar** (en Sueño: «Reintentar sueño»). Si algo no llega, abre esa pantalla y mira ese texto.
 - Estado: implementado; **no probado todavía en un móvil con Health Connect**, y la parte de iPhone **no está compilada ni probada**.
 
 ## Solución de problemas

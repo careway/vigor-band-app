@@ -6,7 +6,7 @@ import 'package:vigor_app/data/health_sync.dart';
 import 'package:vigor_app/data/repo.dart';
 
 class FakeGateway implements HealthGateway {
-  bool ios; HealthAvail av = HealthAvail.ready; bool permit = true; bool failWrites = false;
+  bool ios; HealthAvail av = HealthAvail.ready; bool permit = true; bool failWrites = false; final failTypes = <HType>{};
   final granted = <HType>{}; final items = <HealthItem>[]; final workouts = <WorkoutOut>[]; final routes = <String, int>{}; final deleted = <HType>[]; final deletedW = <String>[];
   void Function(HealthItem)? onWrite; int requests = 0;
   FakeGateway({this.ios = false});
@@ -16,7 +16,8 @@ class FakeGateway implements HealthGateway {
   @override bool supports(HType t) => !(ios && (t == HType.hrvRmssd || t == HType.restingHr));
   @override Future<bool> hasPermissions(Set<HType> types) async => types.isNotEmpty && granted.containsAll(types);
   @override Future<bool> requestPermissions(Set<HType> types) async { requests++; if (permit) granted.addAll(types); return permit; }
-  @override Future<bool> write(HealthItem it) async { if (failWrites) return false; items.add(it); onWrite?.call(it); return true; }
+  @override String? get lastError => failWrites ? 'PlatformException: simulado' : null;
+  @override Future<bool> write(HealthItem it) async { if (failWrites || failTypes.contains(it.type)) return false; items.add(it); onWrite?.call(it); return true; }
   @override Future<String?> writeWorkout(WorkoutOut w) async { if (failWrites) return null; workouts.add(w); return 'w-${w.key}'; }
   @override Future<bool> writeRoute(String id, List<RoutePoint> pts) async { routes[id] = pts.length; return true; }
   @override Future<bool> deleteRange(HType t, DateTime a, DateTime b) async { deleted.add(t); return true; }

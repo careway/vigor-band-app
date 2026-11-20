@@ -15,6 +15,10 @@ class PlatformHealthGateway implements HealthGateway {
   @override String get platformName => Platform.isIOS ? 'Apple Salud' : 'Health Connect';
   @override bool get isIos => Platform.isIOS;
 
+  String? _err;
+  @override String? get lastError => _err;
+  static String _short(Object e) { final m = '${e is PlatformException ? (e.message ?? e.code) : e}'.replaceAll(RegExp(r'\s+'), ' '); return '${e.runtimeType}: ${m.length > 80 ? m.substring(0, 80) : m}'; }
+
   Future<void> _cfg() async { if (!_configured) { await _h.configure(); _configured = true; } }
 
   /// Tipo de la plataforma o null si Vigor no lo escribe allí.
@@ -67,9 +71,17 @@ class PlatformHealthGateway implements HealthGateway {
   @override
   Future<bool> write(HealthItem it) async {
     final type = _map(it.type); if (type == null) return false;
-    await _cfg();
-    return _h.writeHealthData(value: it.value, type: type, startTime: it.start, endTime: it.end,
-        clientRecordId: isIos ? null : it.id, clientRecordVersion: isIos ? null : it.version, recordingMethod: RecordingMethod.automatic);
+    _err = null;
+    try {
+      await _cfg();
+      Future<bool> w(HealthDataType t) => _h.writeHealthData(value: it.value, type: t, startTime: it.start, endTime: it.end,
+          clientRecordId: isIos ? null : it.id, clientRecordVersion: isIos ? null : it.version, recordingMethod: RecordingMethod.automatic);
+      var ok = await w(type);
+      // Cobertura: si Health Connect rechaza la sesión de sueño, se prueba con una etapa «dormido» (mismo permiso WRITE_SLEEP).
+      if (!ok && it.type == HType.sleep && !isIos) ok = await w(HealthDataType.SLEEP_ASLEEP);
+      if (!ok) _err = 'el sistema rechazó la escritura (sin detalle; ver logcat FLUTTER_HEALTH)';
+      return ok;
+    } catch (e) { _err = _short(e); return false; }
   }
 
   @override
