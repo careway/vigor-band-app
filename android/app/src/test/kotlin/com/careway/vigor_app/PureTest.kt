@@ -116,3 +116,19 @@ class AutoMeasureRulesTest {
         org.junit.Assert.assertNull(AutoMeasureRules.safeInterval(10, 0))
     }
 }
+
+class Dev006Test {
+    @Test fun heartValuesOutsideRangeAreInvalid() {
+        assertFalse(HeartRules.valid(0)); assertFalse(HeartRules.valid(29)); assertTrue(HeartRules.valid(30)); assertTrue(HeartRules.valid(220)); assertFalse(HeartRules.valid(221)); assertFalse(HeartRules.valid(-5))
+    }
+    @Test fun heartHasHardTimeLimit() { assertTrue(HeartRules.MAX_MS in 1..120_000) }
+    @Test fun apkNamesMustBeSimple() {
+        assertTrue(UpdateRules.safeName("vigor-update.apk"))
+        for (n in listOf(null, "", "../x.apk", "a/b.apk", "x.apk.part", "x.sh", "..apk", "a b.apk", "\\x.apk")) assertFalse("$n", UpdateRules.safeName(n))
+    }
+    @Test fun onlyNewerOwnPackageIsAccepted() {
+        assertTrue(UpdateRules.acceptable("com.careway.vigor_app", "com.careway.vigor_app", 5, 6))
+        assertFalse(UpdateRules.acceptable("com.careway.vigor_app", "com.careway.vigor_app", 5, 5))
+        assertFalse(UpdateRules.acceptable("com.careway.vigor_app", "com.otra", 5, 9)); assertFalse(UpdateRules.acceptable("com.careway.vigor_app", null, 5, 9))
+    }
+}

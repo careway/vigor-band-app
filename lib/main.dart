@@ -4,6 +4,7 @@ import 'data/analysis.dart';
 import 'data/repo.dart';
 import 'ui/fx.dart';
 import 'theme/tokens.dart';
+import 'ui/about_page.dart';
 import 'ui/activity_page.dart';
 import 'ui/device_page.dart';
 import 'ui/sleep_page.dart';
@@ -54,7 +55,7 @@ class _ShellState extends State<Shell> {
             if (repo.syncing) const Padding(padding: EdgeInsets.all(16), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))
             else Padding(padding: const EdgeInsets.only(right: 16), child: Icon(Icons.circle, size: 10, color: repo.conn == 'connected' ? c.steps : c.muted)),
           ]),
-          body: SafeArea(bottom: false, child: AnimatedSwitcher(duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 250), child: KeyedSubtree(key: ValueKey(tab), child: pages[tab]))),
+          body: SafeArea(bottom: false, child: Column(children: [UpdateBanner(repo), Expanded(child: AnimatedSwitcher(duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 250), child: KeyedSubtree(key: ValueKey(tab), child: pages[tab])))])),
           bottomNavigationBar: FloatNav(index: tab, onTap: (i) => setState(() => tab = i), items: const [
             (Icons.blur_circular_outlined, Icons.blur_circular, 'Hoy'), (Icons.route_outlined, Icons.route, 'Actividad'), (Icons.bedtime_outlined, Icons.bedtime, 'Sueño'), (Icons.tune_outlined, Icons.tune, 'Ajustes'),
           ]),

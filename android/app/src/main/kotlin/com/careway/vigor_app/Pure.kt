@@ -95,3 +95,17 @@ object AutoMeasureRules {
         return if (req % stepUnit == 0) req else null
     }
 }
+
+object HeartRules {
+    const val MAX_MS = 70_000L
+    /** La SDK documenta 20-300; 0 y valores fuera de un rango fisiologico razonable no se reenvian a la interfaz. */
+    fun valid(v: Int) = v in 30..220
+}
+
+object UpdateRules {
+    private val NAME = Regex("^[A-Za-z0-9._-]{1,64}\\.apk$")
+    /** Solo se instala un APK que la propia app descargo en su carpeta de actualizaciones: nombre simple, sin rutas. */
+    fun safeName(n: String?) = n != null && NAME.matches(n) && !n.contains("..")
+    /** El APK debe ser de este paquete y de una version mayor que la instalada. */
+    fun acceptable(ownPkg: String, pkg: String?, installed: Long, candidate: Long) = pkg == ownPkg && candidate > installed
+}

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'analysis.dart';
+import 'heart_meter.dart';
+import 'updater.dart';
 import 'sports.dart';
 export 'analysis.dart' show Sample;
 
@@ -76,6 +78,9 @@ class VigorRepo extends ChangeNotifier {
   Future<void> setThemeMode(int v) async { themeMode = v.clamp(0, 2); await _m.invokeMethod('setPref', {'key': 'theme', 'value': themeMode}); notifyListeners(); }
   DateTime Function() clock = DateTime.now;
   StreamSubscription? _sub;
+  /// Medición puntual de pulso (SDK startDetectHeart). Solo mide cuando el usuario lo pide.
+  late final heart = HeartMeter(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'), isConnected: () => conn == 'connected');
+  final updater = Updater();
 
   Future<void> init() async {
     _sub = _e.receiveBroadcastStream().listen(_onEvent);
@@ -91,11 +96,12 @@ class VigorRepo extends ChangeNotifier {
     try { await reload(); } catch (e) { loadError = 'datos: ${e.runtimeType}'; loaded = true; }
     try { agps = await _m.invokeMethod<Map>('agpsStatus') ?? {}; } catch (_) {}
     notifyListeners();
+    unawaited(updater.init());
     if (savedMac != null) { try { await connectSaved(); } catch (_) {} }
   }
 
   @override
-  void dispose() { _sub?.cancel(); super.dispose(); }
+  void dispose() { _sub?.cancel(); heart.dispose(); updater.dispose(); super.dispose(); }
 
   void _onEvent(dynamic ev) {
     if (ev is! Map) return;
@@ -106,7 +112,7 @@ class VigorRepo extends ChangeNotifier {
     switch (m['type']) {
       case 'scan': found[m['mac']] = m;
       case 'state':
-        conn = m['value'];
+        conn = m['value']; if (conn != 'connected') heart.cancel();
         if (conn == 'connected') { _m.invokeMethod<String>('savedMac').then((v) { savedMac = v; notifyListeners(); }, onError: (_) {}); }
       case 'battery': final pc = m['percent']; if (pc is num) battery = pc.toInt(); charging = m['charging'] == true;
       case 'sync':
@@ -119,6 +125,7 @@ class VigorRepo extends ChangeNotifier {
         final it = m['items'];
         if (it is List) autoMeasures = [for (final e in it) if (e is Map) AutoMeasure.fromMap(e)];
       case 'autoMeasureResult': autoMsg = m['ok'] == true ? 'Ajuste enviado a la pulsera.' : (m['msg']?.toString() ?? 'La pulsera no aceptó el ajuste.'); if (m['ok'] == true) readAutoMeasure();
+      case 'heart': heart.onEvent(m);
       case 'log': logs.insert(0, '${m['msg']}'); if (logs.length > 200) logs.removeLast();
     }
     notifyListeners();

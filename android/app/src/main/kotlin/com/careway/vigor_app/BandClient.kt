@@ -21,6 +21,8 @@ import com.veepoo.protocol.listener.data.ISleepDataListener
 import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.veepoo.protocol.listener.data.IDeviceFuctionDataListener
 import com.veepoo.protocol.listener.data.IFindDevicelistener
+import com.veepoo.protocol.listener.data.IHeartDataListener
+import com.veepoo.protocol.model.datas.HeartData
 import com.veepoo.protocol.listener.data.IPwdDataListener
 import com.veepoo.protocol.listener.data.ISocialMsgDataListener
 import com.veepoo.protocol.listener.data.ISportModelOriginListener
@@ -161,6 +163,7 @@ object BandClient {
         cancelConnectTimeout()
         val was = connected || connecting
         connected = false; connecting = false; weConnectedHeadless = false
+        heartOn = false; main.removeCallbacks(heartStop)
         if (syncing) { syncGen++; syncing = false; emit(mapOf("type" to "sync", "value" to "end")) }
         state("disconnected")
         if (was) { val cbs = readyCbs; readyCbs = mutableListOf(); cbs.forEach { it(false) } }
@@ -394,6 +397,26 @@ object BandClient {
         }
         try { mgr.setAutoMeasureSettingData(noop, d, autoListener) } catch (e: Throwable) { emit(mapOf("type" to "autoMeasureResult", "ok" to false)) }
     }
+    // ---- Medicion puntual de pulso (SDK startDetectHeart / stopDetectHeart). Siempre con tope de tiempo: nunca queda midiendo (bateria). ----
+    private var heartOn = false
+    private val heartStop = Runnable { stopHeartNow(); emit(mapOf("type" to "heart", "status" to "TIMEOUT", "value" to 0)) }
+    private val heartListener = IHeartDataListener { d: HeartData? ->
+        if (heartOn && d != null) emit(mapOf("type" to "heart", "status" to (d.heartStatus?.name ?: ""), "value" to (if (HeartRules.valid(d.data)) d.data else 0)))
+    }
+    fun startHeart() = main.post {
+        if (!connected) { emit(mapOf("type" to "heart", "status" to "STATE_HEART_BUSY", "value" to 0)); return@post }
+        try {
+            heartOn = true; main.removeCallbacks(heartStop); main.postDelayed(heartStop, HeartRules.MAX_MS)
+            mgr.startDetectHeart(noop, heartListener)
+        } catch (e: Throwable) { log("startDetectHeart: " + e.javaClass.simpleName); heartOn = false; main.removeCallbacks(heartStop) }
+    }
+    private fun stopHeartNow() {
+        main.removeCallbacks(heartStop)
+        if (!heartOn) return
+        heartOn = false
+        try { mgr.stopDetectHeart(noop) } catch (e: Throwable) { log("stopDetectHeart: " + e.javaClass.simpleName) }
+    }
+    fun stopHeart() = main.post { stopHeartNow() }
     fun stopSport() = main.post { mgr.stopSportModel(noop, stateListener) }
     fun sportState() = main.post { mgr.readSportModelState(noop, stateListener) }
     fun findBand() = main.post {

@@ -132,3 +132,9 @@ Guía de pruebas: `docs/equipo/informes/REVISION_004.md` §b y «Estado final v1
 ## Ronda DEV_005 (modos deportivos, rediseño de Actividad, cadencia y submenús de Ajustes)
 - Hecho en código (ver `equipo/informes/DEV_005.md`): tabla de ~187 modos (`lib/data/sports.dart`, nombres leídos de la enum del AAR), selector en rejilla con buscador y filtro recorrido/interior, tarjetas y detalle por tipo, lectura/escritura de la medición automática (`readAutoMeasureSettingData`/`setAutoMeasureSettingData`), Ajustes en 8 submenús (pestaña «Dispositivo» renombrada «Ajustes»), tema oscuro/claro/sistema.
 - NO verificado: iniciar un modo concreto en la pulsera, qué modos admite la VIGOR, cambio real de cadencia en la pulsera, 15 ids de modo deducidos (no están en la documentación), tema claro, TalkBack, instalación en el móvil (no se instaló).
+
+
+## DEV_006 (2026-11-20): actualizaciones y pulso en vivo
+- **Actualizaciones automáticas:** implementadas y con tests (Dart y JVM). No verificadas de extremo a extremo: el repositorio es privado, así que la comprobación da 404 y la app lo trata en silencio como "no se puede comprobar". No se ha probado la instalación real en el móvil.
+- **Pulso en el círculo de Hoy:** implementado, **no probado en hardware** (la pulsera no está disponible). Solo hay tests con fakes. La SDK solo ofrece medición manual (`startDetectHeart`); no hay pulso continuo, así que el valor "en vivo" existe solo mientras dura la medición que pide el usuario. Nombres de la SDK comprobados en el AAR (`IHeartDataListener.onDataChange(HeartData)`, `EHeartStatus`, `startDetectHeart`, `stopDetectHeart`).
+- Detalle: `docs/equipo/informes/DEV_006.md`.

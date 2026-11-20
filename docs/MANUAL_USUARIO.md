@@ -74,3 +74,7 @@ En **Ajustes → Privacidad y datos**:
 - **Sin datos / ceros:** sincroniza; la pulsera solo guarda unas horas. Un día sin datos se muestra como "Sin datos registrados este día".
 - **Ruta GPS vacía:** "la pulsera no obtuvo posición suficiente" (interior o sin cielo abierto).
 - **Efemérides pendientes:** conecta la pulsera con batería ≥ 30 % y abre la app.
+
+## Actualizaciones de la app y medir el pulso ahora
+- **Medir pulso ahora:** en Hoy, toca el corazón del centro del reloj. Se abre una hoja con "Empezar": mantén la pulsera ajustada y el brazo quieto (unos 30 s, máximo 60 s). Puedes cancelar; al cerrar la hoja, salir de Hoy o de la app, la medición se para. El valor se rotula "pulso en vivo" mientras mide, "medido a las HH:MM" después (5 min) y, si no, "último registro de HH:MM". Es una medición puntual aproximada, no un diagnóstico. *Función implementada pero aún no probada con la pulsera.*
+- **Actualizaciones:** Ajustes → "Acerca de y actualizaciones" muestra la versión, la última comprobación y "Buscar actualizaciones". Si hay una nueva aparece un aviso en la parte superior con "Actualizar". Android te pedirá permitir instalar desde Vigor y siempre confirmas tú la instalación. Las versiones de prueba van firmadas con la clave de depuración: solo se instalan sobre una versión firmada con la misma clave. Mientras el repositorio sea privado la comprobación no funciona (no se muestra error).

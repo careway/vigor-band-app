@@ -2,4 +2,6 @@
 <!-- H2: el FileProvider solo expone la carpeta privada de exportacion (files/export), nada mas. -->
 <paths>
     <files-path name="export" path="export/" />
+    <!-- Actualizaciones: APK descargado en la cache privada (cache/updates), se borra tras instalar. -->
+    <cache-path name="updates" path="updates/" />
 </paths>

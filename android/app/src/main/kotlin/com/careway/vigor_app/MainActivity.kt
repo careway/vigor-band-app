@@ -109,6 +109,15 @@ class MainActivity : FlutterActivity() {
                     "exportData" -> exportData(result)
                     "wipeData" -> wipeData(result)
                     "clearExport" -> clearExport(result)
+                    "startHeart" -> { BandClient.startHeart(); result.success(null) }
+                    "stopHeart" -> { BandClient.stopHeart(); result.success(null) }
+                    "appVersion" -> {
+                        val pi = packageManager.getPackageInfo(packageName, 0)
+                        result.success(mapOf("code" to androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(pi), "name" to (pi.versionName ?: "")))
+                    }
+                    "updateDir" -> result.success(updateDir().apply { mkdirs() }.absolutePath)
+                    "cleanUpdates" -> { try { updateDir().deleteRecursively() } catch (_: Throwable) {}; result.success(null) }
+                    "installApk" -> result.success(installApk(call.argument<String>("name")))
                     "isConnected" -> result.success(BandClient.connected)
                     else -> result.notImplemented()
                 }
@@ -119,6 +128,28 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         BandClient.listener = null; sink = null; uiHandler.removeCallbacksAndMessages(null); ioExec.shutdown()
         super.onDestroy()
+    }
+
+    override fun onStop() { BandClient.stopHeart(); super.onStop() } // la medicion de pulso nunca sigue en segundo plano
+
+    private fun updateDir() = java.io.File(cacheDir, "updates")
+
+    /** Abre el instalador de paquetes del sistema con el APK descargado (FileProvider, lectura temporal). Devuelve "started" o "needsPermission". No instala nada por su cuenta. */
+    private fun installApk(name: String?): String {
+        if (!UpdateRules.safeName(name)) throw IllegalArgumentException("nombre no valido")
+        val f = java.io.File(updateDir(), name!!)
+        if (!f.isFile || f.canonicalFile.parentFile != updateDir().canonicalFile) throw IllegalArgumentException("archivo no valido")
+        if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+            startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:$packageName")))
+            return "needsPermission"
+        }
+        val info = packageManager.getPackageArchiveInfo(f.absolutePath, 0)
+        val cur = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(packageManager.getPackageInfo(packageName, 0))
+        val cand = if (info == null) 0L else androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info)
+        if (!UpdateRules.acceptable(packageName, info?.packageName, cur, cand)) { f.delete(); throw IllegalArgumentException("el APK no es una version mas nueva de Vigor") }
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", f)
+        startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
+        return "started"
     }
 
     private fun exportDir() = java.io.File(filesDir, "export")

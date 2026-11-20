@@ -47,13 +47,16 @@ jobs:
         with: { channel: stable, flutter-version: '3.41.9', cache: true }
       - run: flutter pub get
       - name: Build release APK
-        run: flutter build apk --release
+        # versionCode = numero de ejecucion: la app lo compara con "build: N" de la release para saber si hay version nueva.
+        run: flutter build apk --release --build-number=${{ github.run_number }}
       - name: Publish as rolling release "latest"
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk vigor-latest.apk
           gh release delete latest --cleanup-tag --yes || true
+          # La linea "build: N" la lee la app (lib/data/updater.dart, parseBuild). No cambiar el formato sin cambiar el parser.
+          printf 'build: %s\n\nAPK release firmado con la clave de depuración, solo para pruebas. Commit %s.\n' "${{ github.run_number }}" "${GITHUB_SHA::7}" > notes.txt
           gh release create latest vigor-latest.apk --prerelease --target "$GITHUB_SHA" \
             --title "Última versión (main)" \
-            --notes "APK release firmado con la clave de depuración, solo para pruebas. Commit ${GITHUB_SHA::7}."
+            --notes-file notes.txt

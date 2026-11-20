@@ -4,6 +4,7 @@ import '../data/repo.dart';
 import '../theme/tokens.dart';
 import 'charts.dart';
 import 'fx.dart';
+import 'heart_ui.dart';
 import 'metrics.dart';
 import 'widgets.dart';
 
@@ -13,12 +14,16 @@ class TodayPage extends StatefulWidget {
   State<TodayPage> createState() => _TodayPageState();
 }
 
-class _TodayPageState extends State<TodayPage> {
+class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
   String? key; bool expOpen = false, lock = false;
   /// El arrastre del reloj solo reconstruye la tarjeta del reloj (ValueListenableBuilder), no toda la pantalla.
   final scrub = ValueNotifier<double?>(null);
   @override
-  void dispose() { scrub.dispose(); super.dispose(); }
+  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) { if (s != AppLifecycleState.resumed) widget.repo.heart.cancel(); }
+  @override
+  void dispose() { WidgetsBinding.instance.removeObserver(this); widget.repo.heart.cancel(notify: false); scrub.dispose(); super.dispose(); }
 
   void _open(List<MetricSpec> s, String k) => Navigator.of(context).push(PageRouteBuilder(
       transitionDuration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 350),
@@ -120,17 +125,18 @@ class _TodayPageState extends State<TodayPage> {
   }
 
   Widget _dialCard(VC c, VigorRepo r, Day d, double steps, bool isToday) {
-    final lastHr = d.hr.isEmpty ? null : d.hr.last.v;
     return Glass(glow: c.accent, padding: const EdgeInsets.all(Sp.x4), child: Column(children: [
       Stack(alignment: Alignment.center, children: [
         ValueListenableBuilder<double?>(valueListenable: scrub, builder: (_, m, _) => DayDial(day: d, c: c, scrubMin: m, nowMin: isToday ? minutesOf(DateTime.now()) : null, onScrub: (v) => scrub.value = v, onLock: (v) { if (v != lock) setState(() => lock = v); })),
-        IgnorePointer(child: Semantics(container: true, label: 'Pasos: ${steps.round()} de ${r.stepGoal}${lastHr == null ? '' : '. Último pulso ${lastHr.round()} latidos por minuto'}', child: ExcludeSemantics(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('PASOS', style: VT.caption(c).copyWith(letterSpacing: 1.6, fontWeight: FontWeight.w700)),
-          CountUp(steps, (v) => v.round().toString(), VT.display(c).copyWith(fontSize: 46)),
-          Text('de ${r.stepGoal}', style: VT.caption(c)),
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          IgnorePointer(child: Semantics(container: true, label: 'Pasos: ${steps.round()} de ${r.stepGoal}', child: ExcludeSemantics(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('PASOS', style: VT.caption(c).copyWith(letterSpacing: 1.6, fontWeight: FontWeight.w700)),
+            CountUp(steps, (v) => v.round().toString(), VT.display(c).copyWith(fontSize: 46)),
+            Text('de ${r.stepGoal}', style: VT.caption(c)),
+          ])))),
           const SizedBox(height: Sp.x2),
-          if (lastHr != null) Row(mainAxisSize: MainAxisSize.min, children: [PulseHeart(bpm: lastHr, color: c.heart, size: 18), const SizedBox(width: 6), Text('${lastHr.round()} bpm', style: VT.heading(c))]),
-        ])))),
+          HeartCenter(repo: r, lastRecord: d.hr.isEmpty ? null : d.hr.last, canMeasure: isToday),
+        ]),
       ]),
       const SizedBox(height: Sp.x2),
       ValueListenableBuilder<double?>(valueListenable: scrub, builder: (_, m, _) => m == null

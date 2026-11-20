@@ -4,6 +4,7 @@ import '../data/analysis.dart';
 import '../data/repo.dart';
 import '../data/sports.dart';
 import '../theme/tokens.dart';
+import 'about_page.dart';
 import 'widgets.dart';
 
 /// Ajustes: pantalla principal con categorías; cada una abre su subpantalla.
@@ -22,6 +23,7 @@ class SettingsHome extends StatelessWidget {
       (Icons.satellite_alt_outlined, 'Efemérides GPS', 'Ayuda al GPS de la pulsera, en segundo plano', () => AgpsPage(repo)),
       (Icons.lock_outline, 'Privacidad y datos', 'Exportar y borrar tus datos', () => PrivacyPage(repo)),
       (Icons.palette_outlined, 'Apariencia', 'Tema de la app', () => AppearancePage(repo)),
+      (Icons.system_update_outlined, 'Acerca de y actualizaciones', 'Versión ${repo.updater.versionName ?? ''}${repo.updater.available ? ' · hay una nueva' : ''}', () => AboutPage(repo)),
       (Icons.build_outlined, 'Avanzado y depuración', kDebugMode ? 'Herramientas de laboratorio y registro técnico' : 'Registro técnico', () => AdvancedPage(repo)),
     ];
     return ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
