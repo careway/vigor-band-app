@@ -13,12 +13,16 @@ class UpdateBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(listenable: repo.updater, builder: (context, _) {
         final u = repo.updater; final c = VC.of(context);
-        if (!u.available || u.dismissed) return const SizedBox.shrink();
-        return Padding(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x2), child: Panel(padding: const EdgeInsets.all(Sp.x3), child: Row(children: [
-          Icon(Icons.system_update_outlined, color: c.accent), const SizedBox(width: Sp.x3),
-          Expanded(child: Semantics(liveRegion: true, child: Text('Hay una versión nueva (compilación ${u.info!.build})', style: VT.body(c)))),
-          TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AboutPage(repo))), child: const Text('Actualizar')),
-          IconButton(tooltip: 'Ocultar aviso', onPressed: u.dismiss, icon: const Icon(Icons.close, size: 20)),
+        if (!u.showBanner) return const SizedBox.shrink();
+        return Padding(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x2), child: Panel(padding: const EdgeInsets.all(Sp.x3), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Semantics(liveRegion: true, container: true, child: Row(children: [
+            Icon(Icons.system_update_outlined, color: c.accent), const SizedBox(width: Sp.x3),
+            Expanded(child: Text('Hay una versión nueva de Vigor (compilación ${u.info!.build})', style: VT.body(c))),
+          ])),
+          Wrap(alignment: WrapAlignment.end, spacing: Sp.x2, children: [
+            ConstrainedBox(constraints: const BoxConstraints(minHeight: 48, minWidth: 48), child: TextButton(onPressed: u.later, child: const Text('Más tarde'))),
+            ConstrainedBox(constraints: const BoxConstraints(minHeight: 48, minWidth: 48), child: FilledButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AboutPage(repo))), child: const Text('Actualizar'))),
+          ]),
         ])));
       });
 }
@@ -34,8 +38,7 @@ class AboutPage extends StatelessWidget {
           UpdateState.checking => 'Comprobando…',
           UpdateState.upToDate => 'Tienes la última versión.',
           UpdateState.available => 'Hay una versión nueva: compilación ${u.info?.build}.',
-          UpdateState.unavailable => u.message ?? 'No se puede comprobar ahora.',
-          UpdateState.error => u.message ?? 'Error al comprobar.',
+          UpdateState.unavailable || UpdateState.error => u.message ?? 'No se pudo comprobar.',
           UpdateState.downloading => 'Descargando ${(u.progress * 100).round()} %…',
           UpdateState.ready || UpdateState.needsPermission => u.message ?? '',
           UpdateState.unknown => 'Aún no se ha comprobado en esta sesión.',
@@ -52,12 +55,13 @@ class AboutPage extends StatelessWidget {
             Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
               SizedBox(height: 48, child: OutlinedButton(onPressed: busy ? null : () => u.check(), child: const Text('Buscar actualizaciones'))),
               if (u.available && u.state != UpdateState.downloading) SizedBox(height: 48, child: FilledButton(onPressed: u.install, child: const Text('Actualizar'))),
+              if (u.failure != null && u.failure != UpdateFail.offline) SizedBox(height: 48, child: OutlinedButton(onPressed: () async { if (!await u.openReleases() && context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el navegador. Visita: $kReleasesPage'))); }, child: const Text('Abrir página de versiones'))),
               if (u.state == UpdateState.downloading) SizedBox(height: 48, child: OutlinedButton(onPressed: u.cancelDownload, child: const Text('Cancelar'))),
             ]),
           ])),
           const Note('La descarga solo se acepta por https desde github.com. La instalación siempre la confirma el instalador de Android; Vigor no instala nada por su cuenta y borra el archivo descargado después.'),
           const Note('Las versiones de prueba van firmadas con la clave de depuración: solo se pueden instalar encima de una instalación firmada con la misma clave; si no, Android la rechaza y habría que desinstalar antes (se pierden los datos locales; exporta antes en Privacidad y datos).'),
-          const Note('Mientras el repositorio sea privado la comprobación no puede funcionar y no se muestra ningún error.'),
+          const Note('Mientras el repositorio sea privado la comprobación no puede funcionar: la comprobación automática no avisa de nada y la manual te lo explica y ofrece la descarga a mano.'),
         ]);
       });
 }

@@ -56,9 +56,9 @@ class _ShellState extends State<Shell> {
             else Padding(padding: const EdgeInsets.only(right: 16), child: Icon(Icons.circle, size: 10, color: repo.conn == 'connected' ? c.steps : c.muted)),
           ]),
           body: SafeArea(bottom: false, child: Column(children: [UpdateBanner(repo), Expanded(child: AnimatedSwitcher(duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 250), child: KeyedSubtree(key: ValueKey(tab), child: pages[tab])))])),
-          bottomNavigationBar: FloatNav(index: tab, onTap: (i) => setState(() => tab = i), items: const [
+          bottomNavigationBar: ListenableBuilder(listenable: repo.updater, builder: (context, _) => FloatNav(index: tab, onTap: (i) => setState(() => tab = i), badges: repo.updater.available ? const {3} : const {}, items: const [
             (Icons.blur_circular_outlined, Icons.blur_circular, 'Hoy'), (Icons.route_outlined, Icons.route, 'Actividad'), (Icons.bedtime_outlined, Icons.bedtime, 'Sueño'), (Icons.tune_outlined, Icons.tune, 'Ajustes'),
-          ]),
+          ])),
         ));
       });
 

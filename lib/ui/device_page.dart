@@ -16,7 +16,9 @@ class SettingsHome extends StatelessWidget {
   String get _conn => switch (repo.conn) { 'connected' => 'Conectada', 'connecting' => 'Conectando…', 'scanning' => 'Buscando…', 'disconnected' => 'Desconectada', _ => 'Sin conexión' };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: repo.updater, builder: (context, _) => _body(context));
+
+  Widget _body(BuildContext context) {
     final items = <(IconData, String, String, Widget Function())>[
       (Icons.watch_outlined, 'Pulsera', 'VIGOR · $_conn${repo.battery != null ? ' · ${repo.battery}%' : ''}', () => DevicePage(repo)),
       (Icons.monitor_heart_outlined, 'Mediciones y cadencia', 'Medición automática de la pulsera, intervalos y batería', () => MeasurementsPage(repo)),
@@ -36,6 +38,7 @@ class SettingsHome extends StatelessWidget {
         child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 64), child: Padding(padding: const EdgeInsets.all(Sp.x4), child: Row(children: [
           Icon(e.$1, color: VC.of(context).accent), const SizedBox(width: Sp.x3),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(e.$2, style: VT.heading(VC.of(context))), Text(e.$3, style: VT.caption(VC.of(context)))])),
+          if (e.$2 == 'Acerca de y actualizaciones' && repo.updater.available) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.circle, size: 12, color: VC.of(context).heart)),
           const Icon(Icons.chevron_right),
         ]))),
       )))),

@@ -154,3 +154,4 @@ Leyenda: **código** = implementado; **test** = cubierto por test automático (s
 | 76 | P1 | Con Mac: generar `ios/`, capacidad HealthKit, `Info.plist` (NSHealthShareUsageDescription/UpdateUsageDescription), iOS 15+, compilar y probar | Usuario | pendiente |
 | 77 | P2 | `clientRecordId` para sesiones de ejercicio (hoy se evitan duplicados solo con el libro local) y agrupar muestras de pulso | Desarrollador | pendiente (puede exigir canal nativo) |
 | 78 | P2 | Si se publica en Google Play: declaración de tipos de datos de Health Connect y política de privacidad pública | Usuario | pendiente |
+| 74 | P1 | DEV_006-D: mensajes claros al fallar la comprobación manual (sin conexión / no accesible o privado / límite de API / respuesta inválida) con botón a la página de versiones; aviso "Más tarde" por versión; punto en Ajustes | Desarrollador | hecho en código y con tests de fakes (no probado en el móvil ni contra GitHub real) |

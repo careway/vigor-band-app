@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 /// El repositorio es privado: la API devuelve 404 y la app lo trata como "no se puede comprobar" (sin error visible).
 /// Cuando el usuario haga público el repositorio, esta URL empieza a funcionar sola. La app NO lleva ningún token.
 const kUpdateUrl = 'https://api.github.com/repos/careway/vigor-band-app/releases/tags/latest';
+/// Página de versiones para descargar a mano si la comprobación automática no es posible.
+const kReleasesPage = 'https://github.com/careway/vigor-band-app/releases/tag/latest';
 const kApkAsset = 'vigor-latest.apk';
 const kAllowedHosts = {'github.com', 'objects.githubusercontent.com', 'api.github.com'};
 const kCheckEvery = Duration(hours: 12);
@@ -47,6 +49,20 @@ UpdateInfo? parseRelease(dynamic j) {
 bool isNewer(int? installed, int latest) => installed != null && latest > installed;
 bool shouldCheck(DateTime now, DateTime? last) => last == null || now.difference(last) >= kCheckEvery || now.isBefore(last);
 
+/// Por qué falló una comprobación manual (para dar un mensaje claro y accionable, sin códigos).
+enum UpdateFail { offline, inaccessible, rateLimit, invalid }
+
+/// Mensaje en español para cada fallo.
+String failText(UpdateFail f) => switch (f) {
+      UpdateFail.offline => 'No se pudo comprobar: no hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.',
+      UpdateFail.inaccessible => 'No se pudo comprobar: el repositorio de versiones no es accesible (¿es privado?). Puedes descargar a mano desde la página de versiones.',
+      UpdateFail.rateLimit => 'No se pudo comprobar: GitHub limita las consultas temporalmente. Inténtalo más tarde o descarga a mano desde la página de versiones.',
+      UpdateFail.invalid => 'No se pudo comprobar: la respuesta del servidor no es válida. Puedes descargar a mano desde la página de versiones.',
+    };
+
+/// Estado HTTP dentro de una HttpException ('HTTP 404' -> 404).
+int? httpStatusOf(HttpException e) { final m = RegExp(r'HTTP (\d{3})').firstMatch(e.message); return m == null ? null : int.parse(m.group(1)!); }
+
 enum UpdateState { unknown, checking, upToDate, available, unavailable, error, downloading, ready, needsPermission }
 
 class Updater extends ChangeNotifier {
@@ -57,7 +73,7 @@ class Updater extends ChangeNotifier {
   Updater({Future<dynamic> Function(Uri)? fetch, this.clock = DateTime.now}) : fetchJson = fetch ?? _httpJson;
 
   UpdateState state = UpdateState.unknown; UpdateInfo? info; int? installed; String? versionName;
-  DateTime? lastCheck; double progress = 0; String? message; bool dismissed = false; bool _cancel = false;
+  DateTime? lastCheck; double progress = 0; String? message; UpdateFail? failure; int? skippedBuild; bool _cancel = false;
 
   bool _dead = false;
   @override
@@ -66,12 +82,15 @@ class Updater extends ChangeNotifier {
   void dispose() { _dead = true; super.dispose(); }
 
   bool get available => info != null && isNewer(installed, info!.build) && state != UpdateState.upToDate;
+  /// Aviso visible: hay versión nueva y el usuario no ha dicho "Más tarde" para ESA versión.
+  bool get showBanner => available && skippedBuild != info!.build;
 
   Future<void> init() async {
     try {
       final v = await _m.invokeMethod<Map>('appVersion');
       installed = (v?['code'] as num?)?.toInt(); versionName = v?['name'] as String?;
       final p = await _m.invokeMethod<Map>('getPrefs') ?? {};
+      final sk = p['updSkip']; if (sk is int && sk > 0) skippedBuild = sk;
       final mins = p['updChk']; if (mins is int && mins > 0) lastCheck = DateTime.fromMillisecondsSinceEpoch(mins * 60000);
       await _m.invokeMethod('cleanUpdates'); // un APK de una descarga anterior no debe quedarse en la cache
     } catch (_) {}
@@ -82,25 +101,38 @@ class Updater extends ChangeNotifier {
   /// [silent]: la comprobación automática no enseña errores. Nunca lanza.
   Future<void> check({bool silent = false}) async {
     if (state == UpdateState.checking || state == UpdateState.downloading) return;
-    final before = state; state = UpdateState.checking; message = null; notifyListeners();
+    final before = state; state = UpdateState.checking; message = null; failure = null; notifyListeners();
     lastCheck = clock();
     try { await _m.invokeMethod('setPref', {'key': 'updChk', 'value': lastCheck!.millisecondsSinceEpoch ~/ 60000}); } catch (_) {}
     try {
       final j = await fetchJson(Uri.parse(kUpdateUrl)).timeout(const Duration(seconds: 15));
       final r = parseRelease(j);
-      if (r == null) { state = UpdateState.error; message = 'La respuesta no tiene el formato esperado.'; }
+      if (r == null) { state = UpdateState.error; failure = UpdateFail.invalid; }
       else { info = r; state = isNewer(installed, r.build) ? UpdateState.available : UpdateState.upToDate; }
     } on HttpException catch (e) {
-      // 401/403/404: repositorio privado o sin release publicada. No es un fallo del usuario.
-      state = UpdateState.unavailable; message = 'No se puede comprobar ahora (${e.message}).';
+      // 401/403/404: repositorio privado o sin release publicada. 429: límite de la API. Otros: respuesta inválida.
+      final st = httpStatusOf(e);
+      if (st == 429) { state = UpdateState.error; failure = UpdateFail.rateLimit; }
+      else if (st == 401 || st == 403 || st == 404) { state = UpdateState.unavailable; failure = UpdateFail.inaccessible; }
+      else { state = UpdateState.error; failure = UpdateFail.invalid; }
+    } on FormatException {
+      state = UpdateState.error; failure = UpdateFail.invalid;
     } catch (_) {
-      state = UpdateState.error; message = 'Sin conexión o sin respuesta del servidor.';
+      state = UpdateState.error; failure = UpdateFail.offline;
     }
-    if (silent && (state == UpdateState.unavailable || state == UpdateState.error)) { state = before == UpdateState.available ? before : UpdateState.unknown; message = null; }
+    if (failure != null) message = failText(failure!);
+    if (silent && (state == UpdateState.unavailable || state == UpdateState.error)) { state = before == UpdateState.available ? before : UpdateState.unknown; message = null; failure = null; }
     notifyListeners();
   }
 
-  void dismiss() { dismissed = true; notifyListeners(); }
+  /// "Más tarde": silencia el aviso para esta versión (se guarda); si sale otra más nueva, vuelve a avisar.
+  void later() {
+    final i = info; if (i == null) return;
+    skippedBuild = i.build; notifyListeners();
+    _m.invokeMethod('setPref', {'key': 'updSkip', 'value': i.build}).catchError((_) {});
+  }
+  /// Abre la página de versiones en el navegador (solo https de github.com; lo valida también Kotlin).
+  Future<bool> openReleases() async { try { return await _m.invokeMethod<bool>('openUrl', {'url': kReleasesPage}) ?? false; } catch (_) { return false; } }
   void cancelDownload() { _cancel = true; }
 
   /// Descarga, verifica y abre el instalador del sistema. Nada se ejecuta sin la confirmación del instalador de Android.
@@ -164,7 +196,11 @@ class Updater extends ChangeNotifier {
     try {
       final req = await c.getUrl(u); req.headers.set('Accept', 'application/vnd.github+json'); req.headers.set('User-Agent', 'vigor-app');
       final rs = await req.close();
-      if (rs.statusCode != 200) { await rs.drain<void>(); throw HttpException('HTTP ${rs.statusCode}'); }
+      if (rs.statusCode != 200) {
+        // 403 con cuota agotada = límite de la API, no "privado".
+        final limited = rs.statusCode == 429 || (rs.statusCode == 403 && rs.headers.value('x-ratelimit-remaining') == '0');
+        await rs.drain<void>(); throw HttpException('HTTP ${limited ? 429 : rs.statusCode}');
+      }
       final b = await rs.transform(utf8.decoder).join();
       return jsonDecode(b);
     } finally { c.close(force: true); }

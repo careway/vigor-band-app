@@ -111,21 +111,26 @@ class _PulseHeartState extends State<PulseHeart> with SingleTickerProviderStateM
 /// Navegación flotante en píldora.
 class FloatNav extends StatelessWidget {
   final int index; final ValueChanged<int> onTap; final List<(IconData, IconData, String)> items;
-  const FloatNav({super.key, required this.index, required this.onTap, required this.items});
+  /// Pestañas con un punto de aviso (p. ej. versión nueva pendiente).
+  final Set<int> badges;
+  const FloatNav({super.key, required this.index, required this.onTap, required this.items, this.badges = const {}});
   @override
   Widget build(BuildContext context) {
     final c = VC.of(context);
     return SafeArea(top: false, minimum: const EdgeInsets.only(bottom: Sp.x2), child: Padding(
       padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x3),
       child: Glass(radius: 30, padding: const EdgeInsets.all(6), child: Row(children: [
-        for (var i = 0; i < items.length; i++) Expanded(child: Semantics(button: true, selected: i == index, label: items[i].$3, child: InkWell(
+        for (var i = 0; i < items.length; i++) Expanded(child: Semantics(button: true, selected: i == index, label: badges.contains(i) ? '${items[i].$3}, novedad pendiente' : items[i].$3, child: InkWell(
           borderRadius: BorderRadius.circular(24), onTap: () => onTap(i),
           child: AnimatedContainer(
             duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: i == index ? c.accent.withValues(alpha: .16) : Colors.transparent),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(i == index ? items[i].$2 : items[i].$1, size: 22, color: i == index ? c.accent : c.muted),
+              Stack(clipBehavior: Clip.none, children: [
+                Icon(i == index ? items[i].$2 : items[i].$1, size: 22, color: i == index ? c.accent : c.muted),
+                if (badges.contains(i)) Positioned(right: -4, top: -2, child: Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: c.heart, border: Border.all(color: c.surfaceHi, width: 1.5)))),
+              ]),
               const SizedBox(height: 2),
               Text(items[i].$3, style: TextStyle(fontSize: 11, fontWeight: i == index ? FontWeight.w700 : FontWeight.w500, color: i == index ? c.accent : c.muted)),
             ]),

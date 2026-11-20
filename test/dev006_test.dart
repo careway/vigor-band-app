@@ -64,7 +64,7 @@ void main() {
       bm.setMockMethodCallHandler(_mc, (c) async => null);
       final u = mk((_) async => throw const HttpException('HTTP 404'));
       await u.check(silent: true); expect(u.state, UpdateState.unknown); expect(u.message, isNull); expect(u.available, isFalse);
-      await u.check(); expect(u.state, UpdateState.unavailable); expect(u.message, contains('404'));
+      await u.check(); expect(u.state, UpdateState.unavailable); expect(u.message, contains('privado'));
     });
     test('sin red: error solo si no es silencioso', () async {
       bm.setMockMethodCallHandler(_mc, (c) async => null);
