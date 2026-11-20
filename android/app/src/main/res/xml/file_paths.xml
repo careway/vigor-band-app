@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- H2: el FileProvider solo expone la carpeta privada de exportacion (files/export), nada mas. -->
+<paths>
+    <files-path name="export" path="export/" />
+</paths>

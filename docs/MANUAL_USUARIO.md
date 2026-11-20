@@ -1,0 +1,76 @@
+# Manual de usuario
+
+Vigor muestra los datos de tu pulsera VIGOR. **No es un dispositivo médico**: no diagnostica ni da alertas de salud.
+
+## Primera conexión
+1. Cierra la app oficial (G Band) si la tienes abierta: la pulsera solo habla con una app a la vez.
+2. Abre Vigor, ve a **Ajustes → Pulsera** y pulsa **Buscar pulsera**. Concede los permisos que pida (Bluetooth; en versiones antiguas de Android, ubicación solo para buscar).
+3. Elige tu pulsera de la lista y pulsa **Conectar**. Si la pulsera te pide confirmar, hazlo en ella.
+4. Vigor recuerda la pulsera: la próxima vez se conecta sola al abrir, sin buscar. La app sincroniza sola al conectar; también puedes pulsar **Sincronizar**.
+La pulsera guarda unas horas de histórico (≈ 7 h en las pruebas), así que sincroniza con frecuencia.
+
+## Pantallas
+> Nota: las pantallas y funciones añadidas en las últimas rondas se describen según el código; **aún no se han comprobado en el móvil** (estaba bloqueado durante las pruebas), incluida la sección "Privacidad y datos".
+
+**Hoy.** Arriba, una frase resumen. El **Reloj del día** es un dial de 24 h: toca y arrastra por los anillos para ver tu día minuto a minuto (pulso, SpO₂, variabilidad, estrés, MET, temperatura…); doble toque para soltar. Debajo, el botón **Ver datos del día por franjas** abre una lista con una fila por hora (pasos, pulso mínimo/medio/máximo y SpO₂). La **cinta de días** muestra 7 días con su progreso de pasos; toca uno para cambiar de día. Las **teselas** resumen cada métrica; tócalas para ver el detalle con gráfico de 24 h, mínimo/media/máximo y tu media habitual (hasta 14 días). Si una tesela tiene un **punto vacío** en la esquina, hay **pocos datos hoy** (menos del 20 % de las lecturas posibles); en un día pasado se dice "Pocos datos este día". Pulso, estrés, temperatura, etc. pueden mostrar el punto; SpO₂ y variabilidad no (se miden por tandas, sobre todo de noche; su cobertura sigue en el pie del detalle). Una tesela dice **"Sin datos"** si no hay registros y **"Sin datos suficientes"** si hay registros pero ninguno válido. El corazón late al ritmo de tu último pulso. Si no has indicado tu edad, un aviso te lo recuerda: el color del resplandor usa 35 años por defecto.
+
+**Detalle de una métrica.** Bajo el gráfico verás la **calidad de los datos**: "Lecturas válidas: X de Y posibles (Z %)", y, si las hay, cuántas se descartaron por estar fuera de rango. En SpO₂, si hubo lecturas por debajo de 70 %, se dice cuántas se descartaron por posible error de medida y no se muestran.
+- **Pulso:** arriba aparece **Pulso en reposo nocturno (aprox.)**. Es la mediana de las lecturas más bajas entre las 00:00 y las 06:00, y se compara con tu mediana de las últimas noches (necesita 7 noches para tener línea base; hasta entonces dice "Aún sin línea base: k de 7 noches"). Con menos de 60 lecturas válidas muestra "Sin datos suficientes: n de 60 lecturas". No es una puntuación de recuperación.
+- **Variabilidad:** arriba aparece **Variabilidad nocturna (PPG, aprox.)** en ms, con la misma comparación con tu mediana, la media de las últimas noches y su variación (CV). Muestra **"Calidad baja: más del 5 % de las diferencias entre latidos se corrigieron o descartaron."** si se cumple. Los valores de latido "sin dato" (2550 ms, que la pulsera envía a menudo) se ignoran y no cuentan como corrección. **Nota de la tarjeta:** cada medición de la pulsera trae unos 10 latidos (≈ 10 s), una vez por minuto, así que el cálculo es de **ventana ultracorta**; hacen falta 30 mediciones válidas y al menos el 60 % de las registradas (si no: "Sin datos suficientes: n de 30 lecturas" o "…n de N registros válidos (mínimo 60 %)"). La línea base es la mediana de hasta 14 noches válidas de los últimos 30 días (mínimo 7). Se mide con luz en la muñeca y tiende a dar valores más bajos que un ECG: úsala solo para compararte contigo mismo. El gráfico del día se rotula "todo el día (aprox.)".
+**Noche en curso:** si miras la noche de hoy antes de las 06:00, la tarjeta dice "Noche en curso: el dato puede cambiar hasta las 06:00 y no entra en la línea base" y las teselas añaden "(en curso)"; esa noche no cuenta en el historial, el gráfico ni la media semanal.
+En la tesela de pulso se lee "reposo nocturno aprox." o, si no hay noche válida, "reposo aprox., todo el día".
+
+**Actividad.** Arriba, **Iniciar desde el móvil**: pulsa la tarjeta del modo para abrir el **selector** (rejilla agrupada con buscador y filtro **Todos / Recorrido / Interior**; más de 180 modos de la SDK de Veepoo: carrera, caminata, ciclismo, gimnasio, mente y cuerpo, baile, combate, pelota, raqueta, agua, nieve y hielo, otros) y pulsa **Iniciar** / **Parar**. Los modos de **recorrido** (carrera, ciclismo, senderismo...) usan el GPS de la pulsera y luego muestran ruta, distancia y ritmo; los de **interior / sin GPS** (yoga, fuerza, cinta...) no usan ni piden GPS y muestran duración, pulso y calorías. La SDK **no** dice qué modos admite tu pulsera: si no admite el elegido, no empezará (no verificado cuáles admite la VIGOR). La pulsera graba con su propio GPS y el móvil puede desconectarse (esa prueba de larga duración **no está verificada**). Después, la tarjeta **Actividad de la semana (aprox.)**: minutos de actividad moderada-vigorosa de la semana (lunes a domingo) frente a los 150 min de la guía de la OMS 2020, con **dos estimaciones separadas**: "Por MET del fabricante (≥ 3 MET, aprox.)" y "Por pulso (aprox., umbral propio: 70 % de FCmáx)". Si faltan datos en algunos días lo indica ("Faltan datos en k días"; no cuentan como cero) y no hay mensaje de "meta cumplida". Luego, las **actividades guardadas** por la pulsera (con el nombre e icono de su modo; si el código no está en la tabla, «Actividad (n)»). Al abrir una: duración, ritmo medio, pulso medio, calorías ("—" si la pulsera no las informó, es decir, trae 0), pasos, **velocidad media calculada** con la distancia y el tiempo de la pulsera (y un aviso si el ritmo calculado difiere del de la pulsera), ruta GPS, y pulso con zonas y TRIMP.
+**Sueño.** Noches registradas con duración total y despertares; profundo/ligero aparecen marcados "aprox.". Si no hay noches, ponte la pulsera al dormir y sincroniza por la mañana. En las pruebas hechas hasta ahora no se ha comprobado con una noche real.
+**Ajustes.** Pantalla de categorías, cada una con su subpantalla: **Pulsera** (conexión, batería, Sincronizar, Hacer vibrar, Conectar/Desconectar, Buscar; la dirección se muestra enmascarada), **Mediciones y cadencia** (lee de la pulsera sus mediciones automáticas —pulso, SpO₂, temperatura, HRV...—, las activa o desactiva y, si la pulsera lo permite, cambia cada cuántos minutos mide; medir más a menudo gasta más batería; **no verificado con la pulsera**; la SDK no ofrece ajustar el muestreo durante el deporte; aquí está también **Mostrar métricas experimentales**, apagado de serie), **Actividad y deportes**, **Perfil** (edad y meta de pasos), **Efemérides GPS**, **Privacidad y datos**, **Apariencia** (oscuro, claro —sin revisar— o sistema) y **Avanzado y depuración** (registro técnico; las herramientas de laboratorio solo existen en versiones de desarrollo).
+
+## Accesibilidad
+- Con un lector de pantalla, el **Reloj del día** se puede ajustar por franjas de 30 minutos (acciones de aumentar/disminuir) y el botón **Ver datos del día por franjas** da la misma información como lista por horas, sin arrastrar el dedo.
+- Teselas, cinta de días, cifras principales, gráficos, tarjetas de noche, tarjeta semanal y el pie de calidad de datos llevan una descripción hablada completa.
+- La app respeta el ajuste del sistema "reducir animaciones".
+- **No verificado:** todo esto se implementó pero no se probó con TalkBack, tamaños de letra grandes ni el contraste real en el móvil.
+
+## Cómo leer cada métrica
+- **Pasos:** los cuenta la pulsera; la meta por defecto es 8 000 y es editable.
+- **Pulso y zonas:** zonas según % de tu FCmáx estimada (208 − 0,7 × edad). Es una estimación con error típico de ≈ 10 bpm; pon tu edad en Perfil (por defecto 35).
+- **Carga (TRIMP):** índice relativo para compararte contigo mismo, no un valor absoluto.
+- **Variabilidad (RMSSD, ms):** compárala solo con tu propia media; no hay valores "normales" en la app. Etiquetada "aprox." y de ventana ultracorta (≈ 10 latidos por medición).
+- **SpO₂:** tendencia, no sustituye a un oxímetro médico.
+- **Temperatura (cuerpo y piel):** útil para ver cambios respecto a tu media (con ≥ 3 días); el valor absoluto puede errar más de 1 °C. Sin umbrales de fiebre.
+- **Estrés (0–100):** índice relativo del fabricante; solo "más alto/bajo que tu media", sin categorías. La tesela de Hoy lleva el rótulo «índice del fabricante · aprox.» (según DEV_004; **no verificado en pantalla**).
+- **MET:** dato de la pulsera (1 MET ≈ reposo sentado); no se clasifica por intensidad.
+- **Calorías, distancia y ritmo:** los calcula la pulsera; Vigor no los recalcula. Las calorías de 5 min no están verificadas como kcal. En una actividad guardada, "—" significa que la pulsera no las informó.
+- **FC en reposo:** aproximada. De noche, mediana de las 30 lecturas más bajas entre 00:00 y 06:00; si no hay noche válida, de respaldo, media del 10 % más bajo del día.
+- **Minutos de actividad (OMS):** estimación con tu pulsera, no medición clínica; la guía se basa en cuestionarios y acelerómetros, no en esta pulsera.
+- **Ruta GPS:** sin suavizado y cortada donde no hubo señal. La distancia principal es la de la pulsera; el GPS en interior puede acumular deriva.
+
+## Experimental
+**Mostrar métricas experimentales** (Ajustes → Mediciones y cadencia) está **apagado de serie**. Al activarlo aparece un aviso (FDA, 21‑02‑2024) y debes pulsar "Entiendo, activar". Entonces la sección plegada **Experimental · no fiable** muestra glucosa y componentes sanguíneos (ácido úrico, colesterol, triglicéridos…) como estimaciones del fabricante, en gris y sin rangos ni alertas. Ningún reloj o pulsera está autorizado por la FDA para medir glucosa sin pinchar: **no tomes decisiones de salud ni de medicación con estos valores.**
+
+## Efemérides GPS
+Ayudan a la pulsera a fijar el GPS más rápido. Vigor las descarga (como mucho una vez cada ≈ 20 h, con internet) y las envía a la pulsera cuando está a mano y su batería es ≥ 30 %, en silencio. En Ajustes → Efemérides GPS ves la última descarga y el último envío.
+
+## Privacidad y datos
+En **Ajustes → Privacidad y datos**:
+- **Exportar mis datos:** Vigor prepara una copia temporal **privada** de los ficheros de datos (`*.json`: pulso, SpO₂, variabilidad, sueño, actividades…) y abre el **selector de compartir de Android** (título «Guardar o enviar mis datos»). Allí eliges tú dónde guardarla o a qué app enviarla. Después Vigor muestra «Se abrió el selector de compartir con N ficheros. Lo que elijas allí queda fuera del control de Vigor.», o «No hay datos guardados que exportar.»; si falla, «No se pudo exportar los datos.». **Importante:** lo que elijas en el selector queda **fuera del control de Vigor**: la app o carpeta de destino puede conservarlo y leerlo, y Vigor no puede borrarlo. Elige con cuidado. Ya **no existe** una carpeta de Vigor accesible por USB. La copia temporal privada se borra al volver a abrir la pantalla Privacidad, al abrir la app, al exportar de nuevo y con «Borrar todos mis datos». Nada se envía a internet por cuenta de Vigor. **No verificado en el móvil.**
+- **Borrar todos mis datos:** pide confirmación («Borrar todos mis datos» / «Borrar todo» / «Cancelar») y no se puede deshacer. Borra de este móvil los datos de la pulsera que guarda Vigor (pulso, SpO₂, variabilidad, sueño, actividades y rutas), las efemérides descargadas y la copia temporal de exportación; **no** borra las copias que ya hayas guardado o enviado fuera de Vigor. **Se conservan** el emparejamiento con la pulsera, tu edad y tu meta de pasos; no se borra nada de la pulsera ni de otras apps. Está desactivado mientras se sincroniza («Hay una sincronización en curso: no se puede borrar hasta que termine.»). Al terminar dice «Datos borrados de este móvil.»; si falla, «No se pudo borrar (¿sincronizando?)…». **No verificado en el móvil.**
+- Los datos de la pulsera se guardan **solo en el móvil**, en el almacenamiento privado de la app (`files/vigor`). Vigor no los envía a ningún servidor propio ni tiene cuenta.
+- La única conexión a internet que se ve en el código es la descarga del fichero de efemérides con el SDK; no se verificó qué datos incluye esa petición.
+- Se guardan también la dirección de la pulsera (se muestra enmascarada), tu edad, tu meta de pasos y si activaste las métricas experimentales. "Olvidar" la pulsera borra la dirección guardada (no borra el histórico).
+- La copia de seguridad de Android está desactivada para Vigor: los datos no se copian a la nube ni a otro móvil.
+- El almacén local conserva 60 días de lecturas y recorta los más antiguos. Si un fichero se estropea, la app lo aparta (renombra a `.corrupt-…`) y sigue en vacío en lugar de perderlo (probado con tests, no en el móvil).
+- El registro del sistema (logcat) solo se escribe en versiones de desarrollo.
+
+## Solución de problemas
+- **No conecta:** acerca la pulsera, activa Bluetooth, pulsa Conectar de nuevo; tras 45 s se da por agotado. Si cambiaste de pulsera, olvida la anterior y busca de nuevo.
+- **Otra app la tiene:** cierra G Band por completo (o fuerza su parada) y reintenta; solo una app a la vez. Si tras abrir Vigor no conecta, comprueba que G Band no esté abierta ni en segundo plano.
+- **Móvil bloqueado:** la sincronización necesita que Vigor esté en marcha; abre y desbloquea el móvil, y pulsa Sincronizar si no empieza sola. Las efemérides con la app cerrada no están verificadas.
+- **Se corta la conexión mientras sincroniza:** Vigor detiene la sincronización y marca la pulsera como desconectada; pulsa Conectar y Sincronizar de nuevo (la caída real no se ha probado).
+- **Sin 'reposo nocturno' ni 'variabilidad nocturna':** hacen falta lecturas entre las 00:00 y las 06:00 (≥ 60 de pulso, ≥ 30 mediciones de variabilidad válidas) y 7 noches de los últimos 30 días para la comparación. Antes de las 06:00 la noche de hoy aparece "en curso".
+- **"Calidad baja" en la variabilidad:** muchas mediciones con ruido; compárate solo con tus noches buenas. Los latidos "sin dato" (2550 ms) no cuentan como ruido.
+- **Calorías "—":** la pulsera no informó calorías de esa actividad.
+- **Exportar:** no hay carpeta que buscar: se abre el selector de compartir y tú eliges el destino. Si no ves el destino que buscas, prueba otra app del selector (p. ej. un gestor de archivos o un servicio de nube que tú uses; eso queda fuera del control de Vigor). Si «Borrar» no responde, espera a que termine la sincronización. Lleva la pulsera puesta al dormir.
+- **Permisos:** sin permiso de Bluetooth ("Dispositivos cercanos") no se conecta. Concédelo en Ajustes > Apps > Vigor > Permisos. La ubicación solo se pide para buscar por primera vez en Android antiguo.
+- **Sin datos / ceros:** sincroniza; la pulsera solo guarda unas horas. Un día sin datos se muestra como "Sin datos registrados este día".
+- **Ruta GPS vacía:** "la pulsera no obtuvo posición suficiente" (interior o sin cielo abierto).
+- **Efemérides pendientes:** conecta la pulsera con batería ≥ 30 % y abre la app.
