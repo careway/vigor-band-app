@@ -43,7 +43,10 @@ android {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
+    // SDK Veepoo (Apache-2.0) como submodulo git: github.com/HBandSDK/Android_Ble_SDK
+    listOf("jar_base", "jar_core").forEach { d ->
+        implementation(fileTree(mapOf("dir" to "../third_party/Android_Ble_SDK/android_sdk_source/$d", "include" to listOf("*.jar", "*.aar"))))
+    }
     implementation("no.nordicsemi.android:mcumgr-core:2.7.4")
     implementation("no.nordicsemi.android:mcumgr-ble:2.7.4")
     implementation("no.nordicsemi.android.support.v18:scanner:1.4.2")

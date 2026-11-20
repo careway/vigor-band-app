@@ -21,7 +21,7 @@ Versión 1.0 (candidata), probada con una pulsera real en un Xiaomi Mi 9. Solo A
 ## Requisitos
 - Windows con Flutter (en este proyecto: `D:\ProgramFiles\flutter`), Android SDK y `adb` (`D:\Carlos\Documents\platform-tools`).
 - Móvil Android con Bluetooth LE. Solo una app a la vez puede usar la pulsera (cierra G Band, `com.vpgband.app`, antes de usar Vigor).
-- El SDK de Veepoo (`.aar`) va en `android/app/libs/`; su documentación en `D:\band_app\sdk_ref\`.
+- El SDK de Veepoo (Apache-2.0) es un submódulo git en `android/third_party/Android_Ble_SDK`: clona con `git clone --recurse-submodules` o ejecuta `git submodule update --init --depth 1`.
 
 ## Compilar, probar e instalar
 Desde WSL, usando el Flutter de Windows:

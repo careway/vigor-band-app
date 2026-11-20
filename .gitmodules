@@ -1,0 +1,4 @@
+[submodule "android/third_party/Android_Ble_SDK"]
+	path = android/third_party/Android_Ble_SDK
+	url = https://github.com/HBandSDK/Android_Ble_SDK.git
+	shallow = true
