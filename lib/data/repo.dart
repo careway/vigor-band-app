@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'analysis.dart';
 import 'heart_meter.dart';
+import 'live_heart.dart';
 import 'updater.dart';
 import 'sports.dart';
 export 'analysis.dart' show Sample;
@@ -81,8 +82,17 @@ class VigorRepo extends ChangeNotifier {
   /// Medición puntual de pulso (SDK startDetectHeart). Solo mide cuando el usuario lo pide.
   late final heart = HeartMeter(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'), isConnected: () => conn == 'connected');
   final updater = Updater();
+  /// Pulso en vivo con la app abierta (bucle de mediciones cortas). Condiciones: conectada, sin sincronizar, sin deporte, sin medición manual, batería >= 20 %.
+  late final live = LiveHeart(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'),
+      canRun: () => conn == 'connected' && !syncing && !sportActive && !heart.active && !(battery != null && battery! < 20));
+  /// true entre pedir un deporte y detenerlo/desconectar (conservador: durante él no se mide el pulso en vivo).
+  bool sportActive = false;
+  bool liveOn = true; int liveSec = 10;
+  Future<void> setLiveOn(bool v) async { liveOn = v; live.setEnabled(v); await _m.invokeMethod('setPref', {'key': 'liveOn', 'value': v ? 1 : 0}); notifyListeners(); }
+  Future<void> setLiveSec(int v) async { if (!LiveHeart.allowedIntervals.contains(v)) return; liveSec = v; live.setInterval(v); await _m.invokeMethod('setPref', {'key': 'liveSec', 'value': v}); notifyListeners(); }
 
   Future<void> init() async {
+    addListener(live.recheck); heart.addListener(live.recheck);
     _sub = _e.receiveBroadcastStream().listen(_onEvent);
     try {
       savedMac = await _m.invokeMethod<String>('savedMac');
@@ -91,6 +101,8 @@ class VigorRepo extends ChangeNotifier {
       age = ageIsDefault ? defaultAge : a as int;
       final g = p['goal']; if (g is int) stepGoal = g.clamp(1000, 40000);
       showExperimental = p['exp'] == 1;
+      liveOn = p['liveOn'] != 0; final ls = p['liveSec']; liveSec = ls is int && LiveHeart.allowedIntervals.contains(ls) ? ls : 10;
+      live.setEnabled(liveOn); live.setInterval(liveSec);
       themeMode = ((p['theme'] as num?)?.toInt() ?? 0).clamp(0, 2);
     } catch (e) { loadError = 'preferencias: ${e.runtimeType}'; }
     try { await reload(); } catch (e) { loadError = 'datos: ${e.runtimeType}'; loaded = true; }
@@ -101,7 +113,7 @@ class VigorRepo extends ChangeNotifier {
   }
 
   @override
-  void dispose() { _sub?.cancel(); heart.dispose(); updater.dispose(); super.dispose(); }
+  void dispose() { _sub?.cancel(); live.dispose(); heart.dispose(); updater.dispose(); super.dispose(); }
 
   void _onEvent(dynamic ev) {
     if (ev is! Map) return;
@@ -112,20 +124,20 @@ class VigorRepo extends ChangeNotifier {
     switch (m['type']) {
       case 'scan': found[m['mac']] = m;
       case 'state':
-        conn = m['value']; if (conn != 'connected') heart.cancel();
+        conn = m['value']; if (conn != 'connected') { heart.cancel(); sportActive = false; live.clearLowBattery(); }
         if (conn == 'connected') { _m.invokeMethod<String>('savedMac').then((v) { savedMac = v; notifyListeners(); }, onError: (_) {}); }
       case 'battery': final pc = m['percent']; if (pc is num) battery = pc.toInt(); charging = m['charging'] == true;
       case 'sync':
         syncing = m['value'] == 'start';
         if (!syncing) { lastSync = DateTime.now(); reload(); }
       case 'syncProgress': final pv = m['value']; if (pv is num) progress = pv.toDouble();
-      case 'sport': sportMsgs.insert(0, '${m['msg']}');
+      case 'sport': sportMsgs.insert(0, '${m['msg']}'); if ('${m['msg']}' == 'Actividad detenida') sportActive = false;
       case 'autoMeasure':
         autoUnsupported = m['unsupported'] == true;
         final it = m['items'];
         if (it is List) autoMeasures = [for (final e in it) if (e is Map) AutoMeasure.fromMap(e)];
       case 'autoMeasureResult': autoMsg = m['ok'] == true ? 'Ajuste enviado a la pulsera.' : (m['msg']?.toString() ?? 'La pulsera no aceptó el ajuste.'); if (m['ok'] == true) readAutoMeasure();
-      case 'heart': heart.onEvent(m);
+      case 'heart': if (heart.active) { heart.onEvent(m); } else { live.onEvent(m); }
       case 'log': logs.insert(0, '${m['msg']}'); if (logs.length > 200) logs.removeLast();
     }
     notifyListeners();
@@ -159,10 +171,10 @@ class VigorRepo extends ChangeNotifier {
   Future<void> connect(String mac) async { await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }
   Future<void> disconnect() => _m.invokeMethod('disconnect');
   Future<void> sync() => _m.invokeMethod('sync');
-  Future<void> startSport(String t) => _m.invokeMethod('startSport', {'type': t});
+  Future<void> startSport(String t) { sportActive = true; notifyListeners(); return _m.invokeMethod('startSport', {'type': t}); }
   Future<void> readAutoMeasure() => _m.invokeMethod('readAutoMeasure');
   Future<void> setAutoMeasure(int type, bool on, {int? interval}) { autoMsg = null; return _m.invokeMethod('setAutoMeasure', {'type': type, 'on': on, 'interval': interval}); }
-  Future<void> stopSport() => _m.invokeMethod('stopSport');
+  Future<void> stopSport() { sportActive = false; notifyListeners(); return _m.invokeMethod('stopSport'); }
   Future<void> findBand() => _m.invokeMethod('findBand');
   Future<void> forget() async { await _m.invokeMethod('forgetMac'); savedMac = null; notifyListeners(); }
 

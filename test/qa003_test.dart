@@ -219,12 +219,13 @@ void main() {
       bm.setMockMethodCallHandler(_mc, (c) async { calls.add(c); return null; });
       final r = VigorRepo(); r.conn = 'connected';
       await pump(t, MeasurementsPage(r));
+      await t.scrollUntilVisible(find.widgetWithText(SwitchListTile, 'Mostrar métricas experimentales'), 300, scrollable: find.byType(Scrollable).first);
       expect(tester(t), isFalse);
-      await t.tap(find.byType(SwitchListTile)); await t.pumpAndSettle();
+      await t.ensureVisible(find.widgetWithText(SwitchListTile, 'Mostrar métricas experimentales')); await t.pumpAndSettle(); await t.tap(find.widgetWithText(SwitchListTile, 'Mostrar métricas experimentales')); await t.pumpAndSettle();
       expect(find.text('Métricas experimentales'), findsOneWidget);
       await t.tap(find.text('Cancelar')); await t.pumpAndSettle();
       expect(r.showExperimental, isFalse); expect(calls.where((c) => c.method == 'setPref'), isEmpty);
-      await t.tap(find.byType(SwitchListTile)); await t.pumpAndSettle();
+      await t.ensureVisible(find.widgetWithText(SwitchListTile, 'Mostrar métricas experimentales')); await t.pumpAndSettle(); await t.tap(find.widgetWithText(SwitchListTile, 'Mostrar métricas experimentales')); await t.pumpAndSettle();
       await t.tap(find.text('Entiendo, activar')); await t.pumpAndSettle();
       expect(r.showExperimental, isTrue); expect(calls.singleWhere((c) => c.method == 'setPref').arguments, {'key': 'exp', 'value': 1});
     });
@@ -277,4 +278,4 @@ void main() {
   });
 }
 
-bool tester(WidgetTester t) => t.widget<SwitchListTile>(find.byType(SwitchListTile)).value;
+bool tester(WidgetTester t) => t.widget<SwitchListTile>(find.widgetWithText(SwitchListTile, 'Mostrar métricas experimentales')).value;

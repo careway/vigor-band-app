@@ -19,11 +19,11 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
   /// El arrastre del reloj solo reconstruye la tarjeta del reloj (ValueListenableBuilder), no toda la pantalla.
   final scrub = ValueNotifier<double?>(null);
   @override
-  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); }
+  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); widget.repo.live.setVisible(true); }
   @override
-  void didChangeAppLifecycleState(AppLifecycleState s) { if (s != AppLifecycleState.resumed) widget.repo.heart.cancel(); }
+  void didChangeAppLifecycleState(AppLifecycleState s) { final on = s == AppLifecycleState.resumed; widget.repo.live.setVisible(on); if (!on) widget.repo.heart.cancel(); }
   @override
-  void dispose() { WidgetsBinding.instance.removeObserver(this); widget.repo.heart.cancel(notify: false); scrub.dispose(); super.dispose(); }
+  void dispose() { WidgetsBinding.instance.removeObserver(this); widget.repo.heart.cancel(notify: false); widget.repo.live.setVisible(false); scrub.dispose(); super.dispose(); }
 
   void _open(List<MetricSpec> s, String k) => Navigator.of(context).push(PageRouteBuilder(
       transitionDuration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 350),

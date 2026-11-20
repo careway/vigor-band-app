@@ -269,6 +269,7 @@ object BandClient {
     fun syncAll(done: (() -> Unit)? = null) {
         main.post {
             if (!connected || syncing) { done?.invoke(); return@post }
+            stopHeartNow() // la sincronizacion y la medicion de pulso no se solapan
             // H1: comprobar 'wiping' y marcar 'syncing' bajo el mismo cerrojo que usa tryWipe.
             val blocked = synchronized(store) { if (store.wiping) true else { syncing = true; false } }
             if (blocked) { done?.invoke(); return@post }
@@ -404,7 +405,7 @@ object BandClient {
         if (heartOn && d != null) emit(mapOf("type" to "heart", "status" to (d.heartStatus?.name ?: ""), "value" to (if (HeartRules.valid(d.data)) d.data else 0)))
     }
     fun startHeart() = main.post {
-        if (!connected) { emit(mapOf("type" to "heart", "status" to "STATE_HEART_BUSY", "value" to 0)); return@post }
+        if (!connected || syncing) { emit(mapOf("type" to "heart", "status" to "STATE_HEART_BUSY", "value" to 0)); return@post }
         try {
             heartOn = true; main.removeCallbacks(heartStop); main.postDelayed(heartStop, HeartRules.MAX_MS)
             mgr.startDetectHeart(noop, heartListener)

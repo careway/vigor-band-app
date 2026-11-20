@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../data/heart_meter.dart';
+import '../data/live_heart.dart';
 import '../data/repo.dart';
 import '../theme/tokens.dart';
 import 'fx.dart';
 import 'widgets.dart';
+
+String hms(DateTime t) => '${hm(t)}:${two(t.second)}';
 
 /// Centro del reloj: pulso en vivo (medición pedida), si no el último registro del día. Pulsarlo ofrece medir ahora.
 class HeartCenter extends StatelessWidget {
@@ -13,10 +16,14 @@ class HeartCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = VC.of(context); final m = repo.heart;
-    return ListenableBuilder(listenable: m, builder: (context, _) {
-      final live = m.active; final fresh = m.hasFresh; final rec = lastRecord;
-      final num? bpm = fresh ? m.value : rec?.v;
-      final String cap = live ? (m.value == null ? 'midiendo…' : 'pulso en vivo') : fresh ? 'medido a las ${hm(m.at!)}' : rec != null ? 'último registro de ${hm(rec.t)}' : 'toca para medir';
+    return ListenableBuilder(listenable: Listenable.merge([m, repo.live]), builder: (context, _) {
+      final live = m.active; final fresh = m.hasFresh; final rec = lastRecord; final lv = repo.live;
+      final liveOk = !fresh && !live && canMeasure && lv.fresh;
+      final num? bpm = fresh ? m.value : liveOk ? lv.value : rec?.v;
+      final String cap = live ? (m.value == null ? 'midiendo…' : 'pulso en vivo') : fresh ? 'medido a las ${hm(m.at!)}'
+          : liveOk ? 'pulso en vivo · ${hms(lv.at!)}'
+          : rec != null ? '${canMeasure && lv.enabled && lv.phase == LivePhase.noReading ? 'sin lectura · ' : ''}último registro de ${hm(rec.t)}'
+          : canMeasure && lv.enabled && lv.phase == LivePhase.noReading ? 'sin lectura' : 'toca para medir';
       final txt = bpm == null ? 'Medir pulso' : '${bpm.round()} bpm';
       final label = bpm == null ? (canMeasure ? 'Medir pulso ahora. Botón' : 'Sin pulso registrado') : 'Pulso $cap: ${bpm.round()} latidos por minuto.${canMeasure ? ' Toca para medir ahora.' : ''}';
       final body = ConstrainedBox(constraints: const BoxConstraints(minWidth: 48, minHeight: 48), child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [

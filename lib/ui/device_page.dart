@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../data/analysis.dart';
+import '../data/live_heart.dart';
 import '../data/repo.dart';
 import '../data/sports.dart';
 import '../theme/tokens.dart';
@@ -163,6 +164,16 @@ class _MeasurementsPageState extends State<MeasurementsPage> {
         ] else if (m.on) const Note('Esta pulsera no permite cambiar el intervalo de esta medición.'),
       ])),
       const Note('No verificado con la pulsera: la SDK documenta estas funciones, pero esta pulsera puede rechazar valores. No existe en la SDK un ajuste del muestreo durante el deporte.'),
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Pulso en vivo con la app abierta', style: VT.heading(c)),
+          subtitle: Text(r.liveOn ? 'Mide el pulso cada ${r.liveSec} s mientras ves Hoy' : 'Desactivado: solo mide al tocar el corazón', style: VT.caption(c)),
+          value: r.liveOn, onChanged: (v) => r.setLiveOn(v)),
+        if (r.liveOn) ...[
+          Text('Intervalo', style: VT.caption(c)), const SizedBox(height: Sp.x1),
+          Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [for (final v in LiveHeart.allowedIntervals) ChoiceChip(label: Text('$v s'), selected: v == r.liveSec, onSelected: (_) => r.setLiveSec(v))]),
+        ],
+        const Note('Cada medición enciende el sensor óptico unos segundos: medir a menudo gasta batería de la pulsera (más cuanto más corto el intervalo). Solo funciona con la app abierta en Hoy y la pulsera conectada; se detiene al sincronizar, durante un deporte y con la batería de la pulsera por debajo del 20 %. Función implementada pero no probada con la pulsera.'),
+      ])),
       const SectionHeader('Experimentales'),
       Panel(child: SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Mostrar métricas experimentales', style: VT.body(c)),
         subtitle: Text('Glucosa y componentes sanguíneos estimados por el fabricante. Apagado de serie.', style: VT.caption(c)),
