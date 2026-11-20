@@ -8,13 +8,13 @@ import android.os.Build
 import com.inuker.bluetooth.library.search.SearchResult
 import com.inuker.bluetooth.library.search.response.SearchResponse
 import com.veepoo.protocol.VPOperateManager
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 /** Adaptador Flutter <-> BandClient. Eventos: {type: scan|state|battery|sync|syncProgress|sport|log, ...} */
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private var sink: EventChannel.EventSink? = null
     private val ioExec = java.util.concurrent.Executors.newSingleThreadExecutor()
     /** M7/K3: varias peticiones simultaneas; se lanzan en rondas y cada una se resuelve comprobando de verdad sus permisos (ver PermissionQueue). */
@@ -109,6 +109,18 @@ class MainActivity : FlutterActivity() {
                     "exportData" -> exportData(result)
                     "wipeData" -> wipeData(result)
                     "clearExport" -> clearExport(result)
+                    "openHealthSettings" -> result.success(openHealthSettings())
+                    "healthLoad" -> ioExec.execute {
+                        val out = try { BandClient.store.healthState() } catch (e: Throwable) { null }
+                        runOnUiThread { try { result.success(out) } catch (_: Throwable) {} }
+                    }
+                    "healthSave" -> {
+                        val txt = call.argument<String>("json")
+                        ioExec.execute {
+                            val ok = try { BandClient.store.saveHealthState(txt ?: "") } catch (e: Throwable) { false }
+                            runOnUiThread { try { result.success(ok) } catch (_: Throwable) {} }
+                        }
+                    }
                     "startHeart" -> { BandClient.startHeart(); result.success(null) }
                     "stopHeart" -> { BandClient.stopHeart(); result.success(null) }
                     "appVersion" -> {
@@ -131,6 +143,15 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onStop() { BandClient.stopHeart(); super.onStop() } // la medicion de pulso nunca sigue en segundo plano
+
+    /** Abre los ajustes de Health Connect (permisos y datos). Android 14+: pantalla del sistema; antes: la app Health Connect. false si no hay donde abrirlos. */
+    private fun openHealthSettings(): Boolean {
+        val intents = listOf(Intent("android.health.connect.action.HEALTH_HOME_SETTINGS"), Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"))
+        for (i in intents) {
+            try { startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return true } catch (_: Throwable) {}
+        }
+        return false
+    }
 
     private fun updateDir() = java.io.File(cacheDir, "updates")
 

@@ -67,3 +67,6 @@ El propio documento declara: **todo visto solo en resumen o fragmento de búsque
 
 ## Lo recomendado y no hecho
 Recomendado por las investigaciones y **sin constancia de implementación** en el código revisado: desviación nocturna de temperatura, SpO₂ nocturna (mediana y percentil 5, "tiempo bajo 90 %"), calibración de pasos, carga semanal absoluta, nivel de `sportValue`, cadencia/pausas. E8–E11 de la ronda 3 quedaron aplazadas (DEV_002).
+
+## DEV_007: qué se comparte con Health Connect / Apple Salud
+Criterio: solo se comparten métricas con base en este documento y límites escritos (pasos, pulso, SpO₂, sueño, ejercicio). Temperatura (sesgo ≈ ±1,5 °C) va desactivada de serie y marcada «aprox.». Glucosa y componentes sanguíneos estimados, estrés y MET no se comparten: no están validados (FDA, 21-02-2024, sobre glucosa sin pinchar). La tabla completa está en `docs/equipo/informes/DEV_007.md`.

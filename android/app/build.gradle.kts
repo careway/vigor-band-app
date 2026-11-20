@@ -24,7 +24,8 @@ android {
         applicationId = "com.careway.vigor_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Health Connect (connect-client, plugin health) exige minSdk 26 (Android 8.0). Antes era 23.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

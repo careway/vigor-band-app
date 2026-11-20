@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'analysis.dart';
+import 'health_gateway.dart';
+import 'health_sync.dart';
 import 'heart_meter.dart';
 import 'live_heart.dart';
 import 'updater.dart';
@@ -13,7 +15,7 @@ class Day {
   final String date;
   double steps = 0, kcal = 0, km = 0;
   final hr = <Sample>[], spo2 = <Sample>[], hrv = <Sample>[];
-  final met = <Sample>[], stress = <Sample>[], temp = <Sample>[], skin = <Sample>[], glucose = <Sample>[], steps5 = <Sample>[];
+  final met = <Sample>[], stress = <Sample>[], temp = <Sample>[], skin = <Sample>[], glucose = <Sample>[], steps5 = <Sample>[], km5 = <Sample>[], kcal5 = <Sample>[];
   final blood = <(DateTime, Map)>[]; // estimaciones experimentales (ácido úrico, colesterol, ...)
   /// E1: calidad por métrica ('hr','spo2','hrv','met','stress','temp','skin').
   final q = <String, Quality>{};
@@ -72,6 +74,7 @@ class VigorRepo extends ChangeNotifier {
   String? loadError;
   Map agps = {};
   bool loaded = false;
+  Map healthPrefs = const {};
   /// N28: glucosa y componentes sanguíneos solo tras activarlo en Dispositivo → Ajustes. Apagado de serie.
   bool showExperimental = false;
   /// 0 oscuro (principal), 1 claro, 2 sistema.
@@ -82,6 +85,18 @@ class VigorRepo extends ChangeNotifier {
   /// Medición puntual de pulso (SDK startDetectHeart). Solo mide cuando el usuario lo pide.
   late final heart = HeartMeter(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'), isConnected: () => conn == 'connected');
   final updater = Updater();
+  /// Sincronización opcional con Health Connect / Apple Salud (solo escribe; apagada de serie). Ver health_sync.dart.
+  late final health = HealthSync(gateway: PlatformHealthGateway(),
+      savePref: (k, v) => _m.invokeMethod('setPref', {'key': k, 'value': v}),
+      loadLedger: () => _m.invokeMethod<String>('healthLoad'),
+      saveLedger: (j) async => await _m.invokeMethod<bool>('healthSave', {'json': j}) ?? false)
+    ..source = (() => HealthSource(days, nights, sessions, restingByDay()));
+  /// Pulso en reposo nocturno por fecha (calculado por Vigor, noche 00:00-06:00); solo noches ya terminadas y con datos suficientes.
+  Map<String, double> restingByDay() {
+    final out = <String, double>{};
+    for (final k in dayKeys) { if (nightInProgress(k)) continue; final n = nightHr(k); if (n.state == NightState.data && n.value != null) out[k] = n.value!; }
+    return out;
+  }
   /// Pulso en vivo con la app abierta (bucle de mediciones cortas). Condiciones: conectada, sin sincronizar, sin deporte, sin medición manual, batería >= 20 %.
   late final live = LiveHeart(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'),
       canRun: () => conn == 'connected' && !syncing && !sportActive && !heart.active && !(battery != null && battery! < 20));
@@ -104,8 +119,10 @@ class VigorRepo extends ChangeNotifier {
       liveOn = p['liveOn'] != 0; final ls = p['liveSec']; liveSec = ls is int && LiveHeart.allowedIntervals.contains(ls) ? ls : 10;
       live.setEnabled(liveOn); live.setInterval(liveSec);
       themeMode = ((p['theme'] as num?)?.toInt() ?? 0).clamp(0, 2);
+      healthPrefs = Map<dynamic, dynamic>.from(p);
     } catch (e) { loadError = 'preferencias: ${e.runtimeType}'; }
     try { await reload(); } catch (e) { loadError = 'datos: ${e.runtimeType}'; loaded = true; }
+    try { await health.init(healthPrefs); } catch (_) {}
     try { agps = await _m.invokeMethod<Map>('agpsStatus') ?? {}; } catch (_) {}
     notifyListeners();
     unawaited(updater.init());
@@ -113,7 +130,7 @@ class VigorRepo extends ChangeNotifier {
   }
 
   @override
-  void dispose() { _sub?.cancel(); live.dispose(); heart.dispose(); updater.dispose(); super.dispose(); }
+  void dispose() { _sub?.cancel(); live.dispose(); heart.dispose(); updater.dispose(); health.dispose(); super.dispose(); }
 
   void _onEvent(dynamic ev) {
     if (ev is! Map) return;
@@ -129,7 +146,7 @@ class VigorRepo extends ChangeNotifier {
       case 'battery': final pc = m['percent']; if (pc is num) battery = pc.toInt(); charging = m['charging'] == true;
       case 'sync':
         syncing = m['value'] == 'start';
-        if (!syncing) { lastSync = DateTime.now(); reload(); }
+        if (!syncing) { lastSync = DateTime.now(); reload().then((_) { if (health.master) unawaited(health.run()); }, onError: (_) {}); }
       case 'syncProgress': final pv = m['value']; if (pv is num) progress = pv.toDouble();
       case 'sport': sportMsgs.insert(0, '${m['msg']}'); if ('${m['msg']}' == 'Actividad detenida') sportActive = false;
       case 'autoMeasure':
@@ -204,6 +221,7 @@ class VigorRepo extends ChangeNotifier {
     privacyBusy = true; privacyMsg = null; notifyListeners();
     try {
       await _m.invokeMethod('wipeData');
+      await health.afterWipe();
       days = {}; nights = []; sessions = []; liveSteps = 0; lastSync = null; progress = 0; loadError = null; agps = {};
       logs.clear(); sportMsgs.clear(); exportPath = null; exportFiles = const [];
       try { agps = await _m.invokeMethod<Map>('agpsStatus') ?? {}; } catch (_) {}
@@ -233,6 +251,7 @@ class VigorRepo extends ChangeNotifier {
       final d = day(t);
       d.steps += _n(o['stepValue']); d.kcal += _n(o['calValue']); d.km += _n(o['disValue']);
       d.steps5.add(Sample(t, _n(o['stepValue']).toDouble()));
+      d.km5.add(Sample(t, _n(o['disValue']).toDouble())); d.kcal5.add(Sample(t, _n(o['calValue']).toDouble()));
       final rawMet = o['met'], rawSt = o['pressure'], rawTc = o['temperature'], rawTs = o['baseTemperature'];
       qq(d, 'met').add(rawMet, 0.0001, 254); qq(d, 'stress').add(rawSt, 1, 100); qq(d, 'temp').add(rawTc, 30, 43); qq(d, 'skin').add(rawTs, 15, 43);
       final met = _n(rawMet).toDouble(); if (met > 0 && met < 255) d.met.add(Sample(t, met));
@@ -267,7 +286,7 @@ class VigorRepo extends ChangeNotifier {
       for (final e in d.q.entries) { e.value.possible = possibleSamples(const {'hr': 1440, 'spo2': 1440, 'hrv': 1440}[e.key] ?? 288, isToday: today, now: now); }
     }
     for (final d in ds.values) {
-      for (final l in [d.hr, d.spo2, d.hrv, d.met, d.stress, d.temp, d.skin, d.glucose, d.steps5]) { l.sort((a, b) => a.t.compareTo(b.t)); }
+      for (final l in [d.hr, d.spo2, d.hrv, d.met, d.stress, d.temp, d.skin, d.glucose, d.steps5, d.km5, d.kcal5]) { l.sort((a, b) => a.t.compareTo(b.t)); }
     }
     days = ds;
 

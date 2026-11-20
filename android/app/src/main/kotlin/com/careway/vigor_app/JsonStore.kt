@@ -38,7 +38,7 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
         const val CORRUPT_KEEP_DAYS = 30
         val MAX_ENTRIES = mapOf("sports" to 500, "sportItems" to 500, "sleep" to 400)
         /** H7: lista blanca de tipos conocidos (el `kind` forma el nombre de fichero: nunca rutas). */
-        val KINDS = setOf("origin5", "hrv", "spo2", "half", "live", "sleep", "sports", "sportItems")
+        val KINDS = setOf("origin5", "hrv", "spo2", "half", "live", "sleep", "sports", "sportItems", "health")
     }
 
     /** Un error de E/S (no de formato) NO renombra ni cachea: el fichero bueno se conserva y flush() se niega a sobrescribirlo. */
@@ -118,6 +118,17 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
                 if (!tmp.renameTo(target)) { tmp.delete(); false } else true
             } catch (e: Exception) { tmp.delete(); false }
         }
+    }
+
+    /** Libro de lo enviado a Health Connect/Salud (documento unico, clave "state"). null si aun no existe. Con control de version dentro del JSON (lo valida Dart). */
+    @Synchronized fun healthState(): String? = load("health").optJSONObject("state")?.toString()
+
+    /** Guarda el libro (JSON objeto) y lo vuelca a disco. false si el texto no es un objeto JSON o falla la escritura. */
+    fun saveHealthState(text: String): Boolean {
+        val o = try { JSONObject(text) } catch (e: org.json.JSONException) { return false }
+        if (text.length > 2_000_000) return false
+        synchronized(this) { put("health", "state", o) }
+        return flush("health")
     }
 
     @Synchronized fun all(kind: String): String {

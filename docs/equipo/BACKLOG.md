@@ -144,3 +144,13 @@ Leyenda: **código** = implementado; **test** = cubierto por test automático (s
 | 71 | P1 | DEV_006-B: medición de pulso bajo demanda en el círculo de Hoy (`startDetectHeart`/`stopDetectHeart`) | Desarrollador | implementada, NO probada en hardware (la pulsera no está disponible; solo tests con fakes: estados, tiempo máximo, cancelación, valores inválidos). Pendiente feedback del usuario en remoto |
 | 72 | P2 | Decisión del usuario: hacer público el repositorio para que funcione la comprobación de versiones (sin token en la app); revisar la firma: las versiones de prueba usan la clave de depuración | Usuario | pendiente |
 | 73 | P1 | DEV_006-C: pulso en vivo automático con la app abierta (bucle de mediciones cortas, intervalo 5/10/30/60 s en Ajustes) | Desarrollador | implementada, NO probada en hardware (la pulsera no está disponible; tests con fakes y reloj simulado: temporización, backoff, cancelación, solapes, valores inválidos). Falta medir el gasto de batería real y la fiabilidad de la lectura corta |
+
+
+## DEV_007: Salud y compartir (Health Connect / Apple Salud)
+| # | Prioridad | Tarea | Responsable | Estado |
+|---|---|---|---|---|
+| 74 | P1 | Sincronización unidireccional con Health Connect y Apple Salud, por categorías, opt-in, con borrado y racionalidad de permisos (`DEV_007.md`) | Desarrollador | hecho en código (Android compila y hay tests con fakes; **no probado en un móvil con Health Connect**; iPhone **no compilado ni probado**) |
+| 75 | P1 | Probar en el móvil: permisos, registros en Health Connect, idempotencia, borrado, ruta GPS, pantalla de racionalidad | Usuario + QA | pendiente |
+| 76 | P1 | Con Mac: generar `ios/`, capacidad HealthKit, `Info.plist` (NSHealthShareUsageDescription/UpdateUsageDescription), iOS 15+, compilar y probar | Usuario | pendiente |
+| 77 | P2 | `clientRecordId` para sesiones de ejercicio (hoy se evitan duplicados solo con el libro local) y agrupar muestras de pulso | Desarrollador | pendiente (puede exigir canal nativo) |
+| 78 | P2 | Si se publica en Google Play: declaración de tipos de datos de Health Connect y política de privacidad pública | Usuario | pendiente |

@@ -61,6 +61,16 @@ En **Ajustes → Privacidad y datos**:
 - El almacén local conserva 60 días de lecturas y recorta los más antiguos. Si un fichero se estropea, la app lo aparta (renombra a `.corrupt-…`) y sigue en vacío en lugar de perderlo (probado con tests, no en el móvil).
 - El registro del sistema (logcat) solo se escribe en versiones de desarrollo.
 
+## Salud y compartir (Health Connect / Apple Salud)
+En **Ajustes → Salud y compartir** puedes enviar tus datos de la pulsera a Health Connect (Android) o a Apple Salud (iPhone). Es **opcional y está desactivado**: hasta que lo actives no se envía nada.
+- **Interruptor principal:** al activarlo, el sistema te pide permiso para escribir. Vigor **solo escribe**; no lee lo que otras apps guardan.
+- **Qué se comparte, por categorías (cada una con su interruptor):** Actividad (pasos, distancia, calorías aproximadas), Corazón (pulso; variabilidad RMSSD calculada por Vigor y pulso en reposo estimado, solo en Health Connect), Oxígeno en sangre, Temperatura corporal (aproximada; desactivada de serie), Sueño, Ejercicio y, aparte, Rutas GPS (desactivada de serie).
+- **No se envía nunca:** glucosa, componentes sanguíneos, estrés, MET ni temperatura de la piel. Son estimaciones no validadas o no encajan en esos servicios.
+- El envío es automático tras cada sincronización, solo con lo nuevo (los primeros días, hasta 7 días de datos y 30 de ejercicios y sueño). Apagar una categoría detiene su envío al momento. Verás el estado y el **último envío**.
+- **Dejar de compartir** apaga todo; no revoca permisos ni borra lo ya enviado. Para eso: ajustes de Health Connect (botón en la pantalla) o **Borrar lo que Vigor envió**, que pide confirmación y solo puede borrar lo que escribió Vigor. En iPhone: app Salud → Compartir → Apps → Vigor.
+- Health Connect viene integrado en Android 14 o superior; en Android 13 o inferior hay que instalar la app de Google Play. Vigor necesita Android 8 o superior.
+- Estado: implementado; **no probado todavía en un móvil con Health Connect**, y la parte de iPhone **no está compilada ni probada**.
+
 ## Solución de problemas
 - **No conecta:** acerca la pulsera, activa Bluetooth, pulsa Conectar de nuevo; tras 45 s se da por agotado. Si cambiaste de pulsera, olvida la anterior y busca de nuevo.
 - **Otra app la tiene:** cierra G Band por completo (o fuerza su parada) y reintenta; solo una app a la vez. Si tras abrir Vigor no conecta, comprueba que G Band no esté abierta ni en segundo plano.

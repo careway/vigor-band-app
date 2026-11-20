@@ -6,6 +6,7 @@ import '../data/repo.dart';
 import '../data/sports.dart';
 import '../theme/tokens.dart';
 import 'about_page.dart';
+import 'health_page.dart';
 import 'widgets.dart';
 
 /// Ajustes: pantalla principal con categorías; cada una abre su subpantalla.
@@ -22,6 +23,7 @@ class SettingsHome extends StatelessWidget {
       (Icons.sports_score_outlined, 'Actividad y deportes', '${sportModes.length} modos · FCmáx y zonas', () => SportSettingsPage(repo)),
       (Icons.person_outline, 'Perfil', 'Edad ${repo.age} · meta ${repo.stepGoal} pasos', () => ProfilePage(repo)),
       (Icons.satellite_alt_outlined, 'Efemérides GPS', 'Ayuda al GPS de la pulsera, en segundo plano', () => AgpsPage(repo)),
+      (Icons.favorite_border, 'Salud y compartir', repo.health.master ? 'Compartiendo con ${repo.health.gateway.platformName}' : 'Health Connect / Apple Salud · desactivado', () => HealthPage(repo)),
       (Icons.lock_outline, 'Privacidad y datos', 'Exportar y borrar tus datos', () => PrivacyPage(repo)),
       (Icons.palette_outlined, 'Apariencia', 'Tema de la app', () => AppearancePage(repo)),
       (Icons.system_update_outlined, 'Acerca de y actualizaciones', 'Versión ${repo.updater.versionName ?? ''}${repo.updater.available ? ' · hay una nueva' : ''}', () => AboutPage(repo)),
@@ -270,7 +272,7 @@ class _PrivacyPanelState extends State<PrivacyPanel> {
   Future<void> _wipe(BuildContext context) async {
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
       title: const Text('Borrar todos mis datos'),
-      content: const Text('Se borrarán de este móvil todos los datos de la pulsera que guarda Vigor (pulso, SpO₂, variabilidad, sueño, actividades y rutas), las efemérides descargadas y la copia temporal de exportación (no las copias que ya hayas guardado o enviado fuera de Vigor). '
+      content: const Text('Se borrarán de este móvil todos los datos de la pulsera que guarda Vigor (pulso, SpO₂, variabilidad, sueño, actividades y rutas), las efemérides descargadas y la copia temporal de exportación (no las copias que ya hayas guardado o enviado fuera de Vigor, ni lo escrito en Health Connect / Apple Salud). '
           'No se borra nada de la pulsera ni de otras apps, y se conservan el emparejamiento, tu edad y tu meta de pasos. No se puede deshacer.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Borrar todo'))]));
     if (ok == true) await repo.wipeData();
@@ -280,7 +282,7 @@ class _PrivacyPanelState extends State<PrivacyPanel> {
   Widget build(BuildContext context) => ListenableBuilder(listenable: repo, builder: (context, _) {
     final c = VC.of(context); final busy = repo.privacyBusy;
     return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Note('Tus datos se guardan solo en este móvil. Al exportar, Vigor prepara una copia temporal privada y abre el selector de compartir de Android: tú eliges dónde guardarla o a qué app enviarla. Lo que elijas queda fuera del control de Vigor (otra app o carpeta puede conservarlo o leerlo). La copia temporal se borra al volver a abrir esta pantalla y con «Borrar todos». Vigor no envía nada a internet por su cuenta.'),
+      const Note('Tus datos se guardan solo en este móvil. Al exportar, Vigor prepara una copia temporal privada y abre el selector de compartir de Android: tú eliges dónde guardarla o a qué app enviarla. Lo que elijas queda fuera del control de Vigor (otra app o carpeta puede conservarlo o leerlo). La copia temporal se borra al volver a abrir esta pantalla y con «Borrar todos». Vigor no envía nada a internet por su cuenta. Solo si activas «Salud y compartir», Vigor escribe en Health Connect / Apple Salud (en tu móvil, sin leer nada de allí): lo que ya enviaste se borra desde esa pantalla, no con «Borrar todos».'),
       const SizedBox(height: Sp.x3),
       Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
         OutlinedButton.icon(onPressed: busy ? null : repo.exportData, icon: const Icon(Icons.upload_file_outlined, size: 18), label: const Text('Exportar mis datos')),

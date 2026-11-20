@@ -139,3 +139,8 @@ Guía de pruebas: `docs/equipo/informes/REVISION_004.md` §b y «Estado final v1
 - **Pulso en el círculo de Hoy:** implementado, **no probado en hardware** (la pulsera no está disponible). Solo hay tests con fakes. La SDK solo ofrece medición manual (`startDetectHeart`); no hay pulso continuo, así que el valor "en vivo" existe solo mientras dura la medición que pide el usuario. Nombres de la SDK comprobados en el AAR (`IHeartDataListener.onDataChange(HeartData)`, `EHeartStatus`, `startDetectHeart`, `stopDetectHeart`).
 - Detalle: `docs/equipo/informes/DEV_006.md`.
 - **Pulso en vivo automático (cada 10 s por defecto, con la app abierta en Hoy):** implementado, **no probado en hardware**; cubierto con fakes y reloj simulado. Consumo de batería de la pulsera sin medir. Criterio de estabilidad propio (2 lecturas con diferencia <= 8 lpm o mediana de 3), no validado.
+
+## DEV_007 (2026-11-20): Salud y compartir (Health Connect / Apple Salud)
+- **Implementado:** Ajustes > «Salud y compartir» (maestro apagado de serie, 7 categorías, estado, último envío, abrir ajustes de Health Connect, dejar de compartir, borrar lo enviado). Solo escribe; nunca lee. No exporta glucosa, componentes sanguíneos, estrés, MET ni temperatura de piel. minSdk sube de 23 a 26.
+- **Verificado:** compila (`flutter build apk --debug`), `flutter analyze` limpio, tests Dart (fake) y JVM en verde.
+- **NO probado:** nada de esto se ha visto en un móvil con Health Connect; el lado iPhone (HealthKit) está escrito pero no compilado ni probado (no hay Mac; no existe la carpeta `ios/`). Detalle y tabla de mapeo: `docs/equipo/informes/DEV_007.md`.
