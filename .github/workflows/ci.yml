@@ -46,8 +46,20 @@ jobs:
       - uses: subosito/flutter-action@v2
         with: { channel: stable, flutter-version: '3.41.9', cache: true }
       - run: flutter pub get
+      - name: Restore signing key
+        env:
+          KS_B64: ${{ secrets.VIGOR_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::warning::Falta el secreto VIGOR_KEYSTORE_B64: se firma con la clave de depuracion y la app no se podra actualizar sobre una instalacion anterior."
+          else
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/vigor-release.p12"
+            echo "VIGOR_KEYSTORE_PATH=$RUNNER_TEMP/vigor-release.p12" >> "$GITHUB_ENV"
+          fi
       - name: Build release APK
-        # versionCode = numero de ejecucion: la app lo compara con "build: N" de la release para saber si hay version nueva.
+        env:
+          VIGOR_KEYSTORE_PASSWORD: ${{ secrets.VIGOR_KEYSTORE_PASSWORD }}
+          VIGOR_KEY_ALIAS: vigor
         run: flutter build apk --release --build-number=${{ github.run_number }}
       - name: Publish as rolling release "latest"
         env:
@@ -56,7 +68,7 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk vigor-latest.apk
           gh release delete latest --cleanup-tag --yes || true
           # La linea "build: N" la lee la app (lib/data/updater.dart, parseBuild). No cambiar el formato sin cambiar el parser.
-          printf 'build: %s\n\nAPK release firmado con la clave de depuración, solo para pruebas. Commit %s.\n' "${{ github.run_number }}" "${GITHUB_SHA::7}" > notes.txt
+          printf 'build: %s\n\nAPK release firmado con la clave de Vigor (si el secreto de firma está configurado). Commit %s.\n' "${{ github.run_number }}" "${GITHUB_SHA::7}" > notes.txt
           gh release create latest vigor-latest.apk --prerelease --target "$GITHUB_SHA" \
             --title "Última versión (main)" \
             --notes-file notes.txt

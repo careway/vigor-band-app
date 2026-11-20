@@ -18,8 +18,21 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Restore signing key
+        env:
+          KS_B64: ${{ secrets.VIGOR_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::warning::Falta el secreto VIGOR_KEYSTORE_B64: se firma con la clave de depuracion y la app no se podra actualizar sobre una instalacion anterior."
+          else
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/vigor-release.p12"
+            echo "VIGOR_KEYSTORE_PATH=$RUNNER_TEMP/vigor-release.p12" >> "$GITHUB_ENV"
+          fi
       - name: Build release APK
-        run: flutter build apk --release
+        env:
+          VIGOR_KEYSTORE_PASSWORD: ${{ secrets.VIGOR_KEYSTORE_PASSWORD }}
+          VIGOR_KEY_ALIAS: vigor
+        run: flutter build apk --release --build-number=${{ github.run_number }}
       - name: Rename
         run: cp build/app/outputs/flutter-apk/app-release.apk vigor-${{ github.ref_name }}.apk
       - uses: softprops/action-gh-release@v2

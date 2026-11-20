@@ -1,9 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Firma de release: variables de entorno (CI, secretos de GitHub) o android/key.properties (local, no versionado).
+// Sin ninguna de las dos se firma con la clave de depuracion (solo para pruebas locales; no se puede actualizar sobre una instalacion firmada con otra clave).
+val keyProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun signProp(env: String, key: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: keyProps.getProperty(key)
 
 android {
     namespace = "com.careway.vigor_app"
@@ -31,11 +41,22 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("vigorRelease") {
+            val path = signProp("VIGOR_KEYSTORE_PATH", "storeFile")
+            if (path != null) {
+                storeFile = file(path)
+                storePassword = signProp("VIGOR_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signProp("VIGOR_KEY_ALIAS", "keyAlias") ?: "vigor"
+                keyPassword = signProp("VIGOR_KEY_PASSWORD", "keyPassword") ?: signProp("VIGOR_KEYSTORE_PASSWORD", "storePassword")
+                storeType = "pkcs12"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (signProp("VIGOR_KEYSTORE_PATH", "storeFile") != null) signingConfigs.getByName("vigorRelease") else signingConfigs.getByName("debug")
             // La SDK Veepoo usa reflexion y proxies dinamicos: R8 renombra sus interfaces y rompe con ClassCastException ($Proxy cannot be cast to C0.a).
             isMinifyEnabled = false
             isShrinkResources = false
