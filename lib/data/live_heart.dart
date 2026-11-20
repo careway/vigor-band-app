@@ -24,7 +24,7 @@ class LiveHeart extends ChangeNotifier {
   LiveHeart({required Future<void> Function() start, required Future<void> Function() stop, required this.canRun, this.clock = DateTime.now})
       : _start = start, _stop = stop;
 
-  bool _enabled = true, _visible = false, lowBattery = false, _reading = false, _dead = false;
+  bool _enabled = true, _visible = false, lowBattery = false, _reading = false, _dead = false, _wasRunning = false;
   int _interval = 10;
   LivePhase phase = LivePhase.off;
   int? value; DateTime? at; int failures = 0;
@@ -39,6 +39,9 @@ class LiveHeart extends ChangeNotifier {
   void setInterval(int s) { if (!allowedIntervals.contains(s)) return; _interval = s; if (_next != null) { _next!.cancel(); _next = null; } _reconcile(); }
   /// Visible = pestaña Hoy delante y app en primer plano.
   void setVisible(bool v) { _visible = v; _reconcile(); }
+  /// Al volver a primer plano: borra el backoff y pide una lectura enseguida (si se puede).
+  void resumeNow() { _wasRunning = false; failures = 0; _reconcile(); }
+
   /// Una desconexión limpia el aviso de batería baja de la pulsera.
   void clearLowBattery() { lowBattery = false; _reconcile(); }
 
@@ -50,8 +53,10 @@ class LiveHeart extends ChangeNotifier {
 
   void _reconcile() {
     if (_dead) return;
-    if (!_want) { _halt(LivePhase.off); return; }
-    if (!canRun()) { _halt(LivePhase.paused); return; }
+    if (!_want) { _wasRunning = false; _halt(LivePhase.off); return; }
+    if (!canRun()) { _wasRunning = false; _halt(LivePhase.paused); return; }
+    // Se reanuda tras una pausa (conexión, sincronización, segundo plano...): sin backoff antiguo y con lectura inmediata.
+    if (!_wasRunning) { _wasRunning = true; failures = 0; _next?.cancel(); _next = null; }
     if (!_reading && _next == null) { phase = value == null ? LivePhase.waiting : phase == LivePhase.noReading ? LivePhase.noReading : LivePhase.waiting; _schedule(Duration.zero); }
     notifyListeners();
   }

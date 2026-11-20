@@ -12,7 +12,8 @@ const kUpdateUrl = 'https://api.github.com/repos/careway/vigor-band-app/releases
 const kReleasesPage = 'https://github.com/careway/vigor-band-app/releases/tag/latest';
 const kApkAsset = 'vigor-latest.apk';
 const kAllowedHosts = {'github.com', 'objects.githubusercontent.com', 'api.github.com'};
-const kCheckEvery = Duration(hours: 12);
+/// Separación mínima entre comprobaciones (al iniciar y en cada resume): anti-spam.
+const kCheckEvery = Duration(minutes: 15);
 const kMaxApkBytes = 200 * 1024 * 1024;
 
 class UpdateInfo {
@@ -124,6 +125,9 @@ class Updater extends ChangeNotifier {
     if (silent && (state == UpdateState.unavailable || state == UpdateState.error)) { state = before == UpdateState.available ? before : UpdateState.unknown; message = null; failure = null; }
     notifyListeners();
   }
+
+  /// Al volver a primer plano: comprueba en silencio si han pasado >= 15 min desde la última (nunca dos a la vez).
+  Future<void> onResume() async { if (installed != null && shouldCheck(clock(), lastCheck)) await check(silent: true); }
 
   /// "Más tarde": silencia el aviso para esta versión (se guarda); si sale otra más nueva, vuelve a avisar.
   void later() {

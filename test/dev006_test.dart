@@ -41,11 +41,11 @@ void main() {
       expect(parseRelease(_rel(name: 'otra.apk')), isNull);
       expect(parseRelease([]), isNull); expect(parseRelease({'body': 'build: 1'}), isNull);
     });
-    test('isNewer y shouldCheck (12 h, reloj hacia atrás)', () {
+    test('isNewer y shouldCheck (15 min, reloj hacia atrás)', () {
       expect(isNewer(10, 11), isTrue); expect(isNewer(11, 11), isFalse); expect(isNewer(null, 11), isFalse);
       final now = DateTime(2026, 1, 1, 12);
-      expect(shouldCheck(now, null), isTrue); expect(shouldCheck(now, now.subtract(const Duration(hours: 11))), isFalse);
-      expect(shouldCheck(now, now.subtract(const Duration(hours: 12))), isTrue); expect(shouldCheck(now, now.add(const Duration(hours: 1))), isTrue);
+      expect(shouldCheck(now, null), isTrue); expect(shouldCheck(now, now.subtract(const Duration(minutes: 14))), isFalse);
+      expect(shouldCheck(now, now.subtract(const Duration(minutes: 15))), isTrue); expect(shouldCheck(now, now.add(const Duration(hours: 1))), isTrue);
     });
   });
 
@@ -80,10 +80,10 @@ void main() {
       final u = Updater(fetch: (_) async => _rel(), clock: () => DateTime.utc(2026, 11, 20, 10))..installed = 1; await u.check();
       final v = calls.firstWhere((c) => c.method == 'setPref').arguments['value'] as int; expect(v, lessThan(2147483647)); expect(v, DateTime.utc(2026, 11, 20, 10).millisecondsSinceEpoch ~/ 60000);
     });
-    test('init lee versión y no consulta si ya comprobó hace menos de 12 h', () async {
+    test('init lee versión y no consulta si ya comprobó hace menos de 15 min', () async {
       var fetched = 0; final now = DateTime(2026, 11, 20, 10);
       bm.setMockMethodCallHandler(_mc, (c) async => switch (c.method) {
-        'appVersion' => {'code': 5, 'name': '1.0.0'}, 'getPrefs' => {'updChk': now.subtract(const Duration(hours: 2)).millisecondsSinceEpoch ~/ 60000}, _ => null });
+        'appVersion' => {'code': 5, 'name': '1.0.0'}, 'getPrefs' => {'updChk': now.subtract(const Duration(minutes: 5)).millisecondsSinceEpoch ~/ 60000}, _ => null });
       final u = Updater(fetch: (_) async { fetched++; return _rel(); }, clock: () => now); await u.init();
       expect(u.installed, 5); expect(u.versionName, '1.0.0'); expect(fetched, 0);
     });

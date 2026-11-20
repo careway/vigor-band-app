@@ -21,7 +21,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
   @override
   void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); widget.repo.live.setVisible(true); }
   @override
-  void didChangeAppLifecycleState(AppLifecycleState s) { final on = s == AppLifecycleState.resumed; widget.repo.live.setVisible(on); if (!on) widget.repo.heart.cancel(); }
+  void didChangeAppLifecycleState(AppLifecycleState s) { final on = s == AppLifecycleState.resumed; if (on) { widget.repo.live.setVisible(true); widget.repo.live.resumeNow(); } else { widget.repo.live.setVisible(false); widget.repo.heart.cancel(); } }
   @override
   void dispose() { WidgetsBinding.instance.removeObserver(this); widget.repo.heart.cancel(notify: false); widget.repo.live.setVisible(false); scrub.dispose(); super.dispose(); }
 

@@ -99,7 +99,7 @@ class VigorRepo extends ChangeNotifier {
   }
   /// Pulso en vivo con la app abierta (bucle de mediciones cortas). Condiciones: conectada, sin sincronizar, sin deporte, sin medición manual, batería >= 20 %.
   late final live = LiveHeart(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'),
-      canRun: () => conn == 'connected' && !syncing && !sportActive && !heart.active && !(battery != null && battery! < 20));
+      clock: () => clock(), canRun: () => conn == 'connected' && !syncing && !sportActive && !heart.active && !(battery != null && battery! < 20));
   /// true entre pedir un deporte y detenerlo/desconectar (conservador: durante él no se mide el pulso en vivo).
   bool sportActive = false;
   bool liveOn = true; int liveSec = 10;

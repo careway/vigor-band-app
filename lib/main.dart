@@ -41,8 +41,15 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with WidgetsBindingObserver {
   VigorRepo get repo => widget.repo; int tab = 0;
+  @override
+  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); }
+  @override
+  void dispose() { WidgetsBinding.instance.removeObserver(this); super.dispose(); }
+  /// Al volver a primer plano: comprobar versión (silencioso, con límite de 15 min).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) { if (s == AppLifecycleState.resumed) repo.updater.onResume(); }
   @override
   Widget build(BuildContext context) => ListenableBuilder(listenable: repo, builder: (context, _) {
         final c = VC.of(context);
