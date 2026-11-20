@@ -183,3 +183,6 @@ Lo que no se hizo está en `GUIA_DE_ESTILOS.md` §7.
 - Cambios de plataforma: `minSdk` 26, `MainActivity` extiende `FlutterFragmentActivity`, `PermissionsRationaleActivity` (+ alias `VIEW_PERMISSION_USAGE`), `queries` del paquete de Health Connect, canal `openHealthSettings`.
 - No se exportan: glucosa, componentes sanguíneos, estrés, MET, temperatura de piel (ver tabla en `informes/DEV_007.md`).
 - iOS: código Dart listo, sin carpeta `ios/`; no compilado ni probado. Android: compila; no probado en un móvil con Health Connect.
+
+## 18. Borrado individual y tumbas (DEV_008)
+`JsonStore` guarda tumbas (kind `tomb`, `v:1`: `sleep` por fecha, `sports` por clave, `day` por fecha, retención 90 días); `put`/`putItems` las respetan y `all()` las filtra. Canal `deleteRecords {type: sleep|session|day, keys}`. `VigorRepo.deleteRecords` borra, opcionalmente llama a `HealthSync.deleteFromHealth` (por clientRecordId / UUID / rango) y recarga. UI: `lib/ui/delete_ui.dart` (`confirmAndDelete`, `ManageDataPanel`).

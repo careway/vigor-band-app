@@ -21,6 +21,8 @@ class FakeGateway implements HealthGateway {
   @override Future<String?> writeWorkout(WorkoutOut w) async { if (failWrites) return null; workouts.add(w); return 'w-${w.key}'; }
   @override Future<bool> writeRoute(String id, List<RoutePoint> pts) async { routes[id] = pts.length; return true; }
   @override Future<bool> deleteRange(HType t, DateTime a, DateTime b) async { deleted.add(t); return true; }
+  final deletedIds = <String>[]; bool failDelete = false;
+  @override Future<bool> deleteByClientId(HType t, String id, DateTime a, DateTime b) async { if (failDelete) return false; deletedIds.add(id); return true; }
   @override Future<bool> deleteWorkout(String id) async { deletedW.add(id); return true; }
   @override Future<void> openSettings() async {}
   @override Future<void> installProvider() async {}

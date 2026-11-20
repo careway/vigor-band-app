@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/repo.dart';
 import '../theme/tokens.dart';
+import 'delete_ui.dart';
 import 'widgets.dart';
 
 class SleepPage extends StatelessWidget {
@@ -13,7 +14,7 @@ class SleepPage extends StatelessWidget {
     }
     return ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
       for (final n in repo.nights) Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        MetricHeader(Icons.bedtime, n.date, c.sleep), const SizedBox(height: Sp.x3),
+        Row(children: [Expanded(child: MetricHeader(Icons.bedtime, n.date, c.sleep)), DeleteButton('Borrar la noche del ${n.date}', () => confirmAndDelete(context, repo, type: 'sleep', keys: [n.date], title: 'Borrar esta noche', what: 'Se borrará la noche del ${n.date} (${dur(n.total * 60)} de sueño).'))]), const SizedBox(height: Sp.x3),
         BigValue(dur(n.total * 60), '', size: 32),
         const SizedBox(height: Sp.x2),
         Wrap(spacing: Sp.x6, runSpacing: Sp.x2, children: [

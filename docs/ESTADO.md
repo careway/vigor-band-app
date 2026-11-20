@@ -145,3 +145,5 @@ Guía de pruebas: `docs/equipo/informes/REVISION_004.md` §b y «Estado final v1
 - **Verificado:** compila (`flutter build apk --debug`), `flutter analyze` limpio, tests Dart (fake) y JVM en verde.
 - **NO probado:** nada de esto se ha visto en un móvil con Health Connect; el lado iPhone (HealthKit) está escrito pero no compilado ni probado (no hay Mac; no existe la carpeta `ios/`). Detalle y tabla de mapeo: `docs/equipo/informes/DEV_007.md`.
 - **Sueño y Health Connect (informe del usuario):** no se ha podido determinar la causa sin el móvil; con la muestra real el código envía bien. Se añadió diagnóstico por categoría y «Reintentar sueño». Ver adenda de `DEV_007.md`.
+
+- **DEV_008:** se pueden borrar noches, sesiones (una o varias) y los datos de un día, con tumbas para que la pulsera no los resucite y borrado opcional en Health Connect. Implementado con tests; no probado en el móvil. Ver `informes/DEV_008.md`.

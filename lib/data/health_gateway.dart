@@ -119,6 +119,14 @@ class PlatformHealthGateway implements HealthGateway {
   Future<bool> deleteWorkout(String id) async { await _cfg(); return _h.deleteByUUID(uuid: id, type: HealthDataType.WORKOUT); }
 
   @override
+  Future<bool> deleteByClientId(HType t, String id, DateTime from, DateTime to) async {
+    final type = _map(t); if (type == null) return true;
+    await _cfg();
+    if (isIos) return _h.delete(type: type, startTime: from, endTime: to);
+    return _h.deleteByClientRecordId(dataTypeKey: type, clientRecordId: id);
+  }
+
+  @override
   Future<void> openSettings() async { if (Platform.isAndroid) { try { await _ch.invokeMethod('openHealthSettings'); } catch (_) {} } }
 
   @override

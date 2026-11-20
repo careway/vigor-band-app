@@ -38,7 +38,11 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
         const val CORRUPT_KEEP_DAYS = 30
         val MAX_ENTRIES = mapOf("sports" to 500, "sportItems" to 500, "sleep" to 400)
         /** H7: lista blanca de tipos conocidos (el `kind` forma el nombre de fichero: nunca rutas). */
-        val KINDS = setOf("origin5", "hrv", "spo2", "half", "live", "sleep", "sports", "sportItems", "health")
+        val KINDS = setOf("origin5", "hrv", "spo2", "half", "live", "sleep", "sports", "sportItems", "health", "tomb")
+        /** Tumbas (registros borrados por el usuario): se conservan 90 dias; la pulsera los vuelve a entregar al sincronizar y se ignoran. */
+        const val TOMB_KEEP_DAYS = 90
+        const val TOMB_VERSION = 1
+        val DAY_KINDS = listOf("origin5", "hrv", "spo2", "half")
     }
 
     /** Un error de E/S (no de formato) NO renombra ni cachea: el fichero bueno se conserva y flush() se niega a sobrescribirlo. */
@@ -58,9 +62,10 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
         return o
     }
 
-    @Synchronized fun put(kind: String, key: String, v: JSONObject) { v.put("_key", key); load(kind).put(key, v) }
+    @Synchronized fun put(kind: String, key: String, v: JSONObject) { if (isDead(kind, key)) return; v.put("_key", key); load(kind).put(key, v) }
 
     @Synchronized fun putItems(kind: String, key: String, items: JSONArray, reset: Boolean) {
+        if (isDead(kind, key)) return
         val o = load(kind)
         val cur = if (reset) null else o.optJSONObject(key)
         val arr = cur?.optJSONArray("items") ?: JSONArray()
@@ -80,6 +85,11 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
     /** Aplica retención. Devuelve cuántas entradas se eliminaron. */
     @Synchronized fun prune(kind: String): Int {
         val o = load(kind); var removed = 0
+        if (kind == "tomb") {
+            val d = o.optJSONObject("state") ?: return 0; val cutoff = now() - TOMB_KEEP_DAYS * 86_400_000L
+            for (g in listOf("sleep", "sports", "day")) { val m = d.optJSONObject(g) ?: continue; val del = ArrayList<String>(); val it = m.keys(); while (it.hasNext()) { val k = it.next(); if (m.optLong(k, 0L) < cutoff) del.add(k) }; del.forEach { m.remove(it); removed++ } }
+            return removed
+        }
         RETENTION_DAYS[kind]?.let { days ->
             // Referencia = min(reloj, dato mas reciente): un reloj adelantado no borra datos validos.
             var newest = 0L; val ik = o.keys(); while (ik.hasNext()) { val t = keyDay(ik.next()); if (t != null && t > newest) newest = t }
@@ -107,7 +117,9 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
             g = gen
             val o = load(kind)
             if (!cache.containsKey(kind)) return false // lectura fallida: no se sobrescribe el fichero existente
-            prune(kind); o.toString()
+            prune(kind)
+            if (kind == "tomb" && o.optJSONObject("state") == null) return true // sin tumbas no se crea fichero
+            o.toString()
         }
         beforeWrite?.invoke()
         synchronized(writeLock) {
@@ -131,9 +143,48 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
         return flush("health")
     }
 
+    // ---- Tumbas (DEV_008): un documento kind "tomb", clave "state": {v, sleep:{fecha:ms}, sports:{clave:ms}, day:{yyyy-MM-dd:ms}} ----
+    private fun tombDoc(): JSONObject {
+        val all = load("tomb"); val d = all.optJSONObject("state")
+        if (d != null && d.optInt("v", 0) == TOMB_VERSION) return d
+        return JSONObject().put("_key", "state").put("v", TOMB_VERSION).also { all.put("state", it) }
+    }
+    private fun tombSet(group: String): JSONObject { val d = tombDoc(); return d.optJSONObject(group) ?: JSONObject().also { d.put(group, it) } }
+
+    /** true si el registro fue borrado por el usuario y no debe volver a guardarse ni mostrarse. */
+    @Synchronized fun isDead(kind: String, key: String): Boolean {
+        val d = load("tomb").optJSONObject("state")?.takeIf { it.optInt("v", 0) == TOMB_VERSION } ?: return false // solo lectura: no crea nada
+        return when (kind) {
+            "sleep" -> d.optJSONObject("sleep")?.has(key) == true
+            "sports", "sportItems" -> d.optJSONObject("sports")?.has(key) == true
+            in DAY_KINDS -> key.length >= 10 && d.optJSONObject("day")?.has(key.substring(0, 10)) == true
+            else -> false
+        }
+    }
+
+    /** Borra una noche (clave = fecha), una sesion (clave = inicio "yyyy-MM-dd HH:mm") o un dia entero; deja tumba y vuelca a disco. Devuelve cuantas entradas se quitaron. */
+    fun deleteRecords(type: String, keys: List<String>): Int {
+        var removed = 0; val touched = LinkedHashSet<String>(); touched.add("tomb")
+        synchronized(this) {
+            if (wiping) return -1
+            val now = now()
+            for (k in keys) when (type) {
+                "sleep" -> { tombSet("sleep").put(k, now); if (load("sleep").remove(k) != null) removed++; touched.add("sleep") }
+                "session" -> { tombSet("sports").put(k, now); if (load("sports").remove(k) != null) removed++; load("sportItems").remove(k); touched.add("sports"); touched.add("sportItems") }
+                "day" -> {
+                    tombSet("day").put(k, now)
+                    for (kind in DAY_KINDS) { val o = load(kind); val del = ArrayList<String>(); val it = o.keys(); while (it.hasNext()) { val x = it.next(); if (x.startsWith(k)) del.add(x) }; del.forEach { o.remove(it); removed++ }; touched.add(kind) }
+                }
+                else -> throw IllegalArgumentException("tipo desconocido")
+            }
+        }
+        touched.forEach { flush(it) }
+        return removed
+    }
+
     @Synchronized fun all(kind: String): String {
         val o = load(kind); val a = JSONArray()
-        val ks = o.keys(); while (ks.hasNext()) a.put(o.get(ks.next()))
+        val ks = o.keys(); while (ks.hasNext()) { val k = ks.next(); if (kind != "tomb" && isDead(kind, k)) continue; a.put(o.get(k)) }
         return a.toString()
     }
 

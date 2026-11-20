@@ -212,6 +212,21 @@ class VigorRepo extends ChangeNotifier {
     finally { privacyBusy = false; notifyListeners(); }
   }
 
+  // ---- Borrado individual (DEV_008) ----
+  /// Borra noches ('sleep', clave = fecha), sesiones ('session', clave = inicio) o días enteros ('day', yyyy-MM-dd). Deja tumbas en Kotlin para que la pulsera no los resucite al sincronizar.
+  /// Si [alsoHealth], también pide a Health Connect / Salud que borre lo que Vigor envió. Devuelve null si el borrado local falló.
+  Future<HealthDeleteReport?> deleteRecords(String type, List<String> keys, {bool alsoHealth = false}) async {
+    if (keys.isEmpty) return HealthDeleteReport();
+    final nightsDel = type == 'sleep' ? [for (final n in nights) if (keys.contains(n.date)) n] : <Night>[];
+    final sesDel = type == 'session' ? [for (final s in sessions) if (keys.contains(s.key)) s] : <Session>[];
+    try { await _m.invokeMethod('deleteRecords', {'type': type, 'keys': keys}); } catch (_) { privacyMsg = 'No se pudo borrar.'; notifyListeners(); return null; }
+    HealthDeleteReport rep = HealthDeleteReport();
+    if (alsoHealth) { try { rep = await health.deleteFromHealth(nights: nightsDel, sessions: sesDel, days: type == 'day' ? keys : const []); } catch (_) { rep.failed++; } }
+    try { await reload(); } catch (_) {}
+    notifyListeners();
+    return rep;
+  }
+
   /// Borra la copia privada de exportación (al abrir la pantalla de privacidad). Los errores se ignoran.
   Future<void> clearExport() async { try { await _m.invokeMethod('clearExport'); } catch (_) {} exportPath = null; exportFiles = const []; }
 

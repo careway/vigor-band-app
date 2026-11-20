@@ -77,9 +77,14 @@ abstract class HealthGateway {
   Future<bool> writeRoute(String workoutId, List<RoutePoint> pts);
   Future<bool> deleteRange(HType t, DateTime from, DateTime to);
   Future<bool> deleteWorkout(String id);
+  /// Borra un registro por su id estable (Android: clientRecordId; iOS: por rango de tiempo, ya que HealthKit no usa ids de cliente).
+  Future<bool> deleteByClientId(HType t, String id, DateTime from, DateTime to);
   Future<void> openSettings();
   Future<void> installProvider();
 }
+
+/// Resultado de borrar registros de Health Connect / Salud.
+class HealthDeleteReport { int ok = 0, failed = 0; final notes = <String>[]; }
 
 enum HealthState { off, idle, running, needsPermission, unavailable, error }
 
@@ -146,9 +151,9 @@ class HealthSync extends ChangeNotifier {
     catError.remove(c);
     final wm = _ledger['wm'] as Map;
     for (final st in _streamIds[c] ?? const <String>[]) { wm.remove(st); }
-    if (c == HealthCat.sleep) (_ledger['sleep'] as Map).clear();
-    if (c == HealthCat.exercise) (_ledger['sessions'] as Map).clear();
-    if (c == HealthCat.route) (_ledger['routes'] as Map).clear();
+    if (c == HealthCat.sleep) { (_ledger['sleep'] as Map).clear(); }
+    if (c == HealthCat.exercise) { (_ledger['sessions'] as Map).clear(); }
+    if (c == HealthCat.route) { (_ledger['routes'] as Map).clear(); }
     notifyListeners();
     await run();
   }
@@ -246,6 +251,48 @@ class HealthSync extends ChangeNotifier {
   Future<void> stopSharing() async {
     _cancel = true; master = false; state = HealthState.off; message = null; notifyListeners();
     await savePref('hcOn', 0);
+  }
+
+  // ---- Borrado individual (DEV_008) ----
+  /// Para la UI: asegura que el libro está cargado antes de consultar lo enviado.
+  Future<void> loadLedgerForUi() => _loadLedger();
+  bool sleepSent(String date) => (_ledger['sleep'] as Map).containsKey(date);
+  bool sessionSent(String key) => (_ledger['sessions'] as Map).containsKey(key);
+  /// Un día «se envió» si alguna marca de agua llega a su inicio (aprox.).
+  bool daySent(String day) { final d = DateTime.tryParse(day); if (d == null) return false; return (_ledger['wm'] as Map).values.any((v) => v is num && v >= d.millisecondsSinceEpoch); }
+
+  /// Borra de Health Connect / Salud lo que Vigor envió de esos registros y limpia el libro. Nunca lanza.
+  /// [days]: yyyy-MM-dd (pasos, distancia, calorías, pulso, HRV, pulso en reposo, SpO2, temperatura de ese día).
+  Future<HealthDeleteReport> deleteFromHealth({List<Night> nights = const [], List<Session> sessions = const [], List<String> days = const []}) async {
+    await _loadLedger();
+    final rep = HealthDeleteReport();
+    final sleepIds = [for (final n in nights) if (sleepSent(n.date)) n], sesIds = [for (final x in sessions) if (sessionSent(x.key)) x], dayList = [for (final d in days) if (daySent(d)) d];
+    if (sleepIds.isEmpty && sesIds.isEmpty && dayList.isEmpty) return rep; // nada que borrar allí
+    try { avail ??= await gateway.availability(); } catch (_) { avail = HealthAvail.unsupported; }
+    if (avail != HealthAvail.ready) { rep.notes.add('${gateway.platformName} no está disponible: no se pudo borrar allí.'); rep.failed += sleepIds.length + sesIds.length + dayList.length; return rep; }
+    for (final n in sleepIds) {
+      var ok = false;
+      try { final a = n.down ?? DateTime.parse(n.date), b = n.up ?? a.add(const Duration(hours: 12)); ok = await gateway.deleteByClientId(HType.sleep, 'vigor-sleep-${n.date}', a.subtract(const Duration(minutes: 1)), b.add(const Duration(minutes: 1))); } catch (_) {}
+      if (ok) { (_ledger['sleep'] as Map).remove(n.date); rep.ok++; } else { rep.failed++; }
+    }
+    var companionNote = false;
+    for (final x in sesIds) {
+      var ok = false;
+      try { ok = await gateway.deleteWorkout((_ledger['sessions'] as Map)[x.key] as String); } catch (_) {}
+      if (ok) { (_ledger['sessions'] as Map).remove(x.key); (_ledger['routes'] as Map).remove(x.key); rep.ok++; companionNote = true; } else { rep.failed++; }
+    }
+    if (companionNote) rep.notes.add('La distancia y las calorías que se escriben junto a un ejercicio no se pueden identificar por separado y pueden seguir en ${gateway.platformName}.');
+    for (final d in dayList) {
+      final a = DateTime.parse(d), b = DateTime(a.year, a.month, a.day + 1); var all = true;
+      for (final t in const [HType.steps, HType.distance, HType.activeEnergy, HType.heartRate, HType.hrvRmssd, HType.restingHr, HType.spo2, HType.bodyTemp]) {
+        if (!gateway.supports(t)) continue;
+        try { if (!await gateway.deleteRange(t, a, b)) all = false; } catch (_) { all = false; }
+      }
+      if (all) { rep.ok++; } else { rep.failed++; }
+    }
+    await _persist(); notifyListeners();
+    if (rep.failed > 0) rep.notes.add('No se pudo borrar todo en ${gateway.platformName} (¿falta permiso?). Puedes borrarlo desde sus ajustes.');
+    return rep;
   }
 
   /// Tras «Borrar todos mis datos» el libro local ya no existe: el estado interno se reinicia (lo ya enviado a Health Connect/Salud NO se toca).

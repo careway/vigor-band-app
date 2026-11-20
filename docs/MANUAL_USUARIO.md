@@ -72,6 +72,12 @@ En **Ajustes → Salud y compartir** puedes enviar tus datos de la pulsera a Hea
 - Cada categoría muestra su estado (última noche o dato enviado, pendiente, sin permiso, error al escribir con la causa, sin datos) y un botón para **reenviar** (en Sueño: «Reintentar sueño»). Si algo no llega, abre esa pantalla y mira ese texto.
 - Estado: implementado; **no probado todavía en un móvil con Health Connect**, y la parte de iPhone **no está compilada ni probada**.
 
+## Borrar registros concretos
+- **Una noche:** en Sueño, la papelera de esa noche. **Una o varias sesiones:** en Actividad, «Seleccionar», marca las sesiones y «Borrar»; o la papelera dentro de una sesión. **Los datos de un día** (pasos, pulso, SpO₂, variabilidad, temperatura): en Hoy, menú ⋮ > «Borrar los datos de este día». **Por tipo o por día:** Ajustes > Privacidad y datos > «Gestionar datos».
+- Siempre pide confirmación y no se puede deshacer. La pulsera puede seguir guardando el dato, pero Vigor lo ignora al sincronizar (durante 90 días).
+- Si ya lo enviaste a Health Connect / Apple Salud, puedes marcar «También borrar de …» (solo borra lo que escribió Vigor; la distancia y calorías enviadas junto a un ejercicio pueden quedar). Si falla, la app te lo dice.
+- Estado: implementado; no probado todavía en el móvil.
+
 ## Solución de problemas
 - **No conecta:** acerca la pulsera, activa Bluetooth, pulsa Conectar de nuevo; tras 45 s se da por agotado. Si cambiaste de pulsera, olvida la anterior y busca de nuevo.
 - **Otra app la tiene:** cierra G Band por completo (o fuerza su parada) y reintenta; solo una app a la vez. Si tras abrir Vigor no conecta, comprueba que G Band no esté abierta ni en segundo plano.

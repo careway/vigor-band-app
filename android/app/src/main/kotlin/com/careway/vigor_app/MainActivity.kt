@@ -109,6 +109,13 @@ class MainActivity : FlutterFragmentActivity() {
                     "exportData" -> exportData(result)
                     "wipeData" -> wipeData(result)
                     "clearExport" -> clearExport(result)
+                    "deleteRecords" -> {
+                        val type = call.argument<String>("type") ?: ""; val keys = call.argument<List<String>>("keys") ?: emptyList()
+                        ioExec.execute {
+                            val n = try { BandClient.store.deleteRecords(type, keys) } catch (e: Throwable) { -1 }
+                            runOnUiThread { try { if (n >= 0) result.success(n) else result.error("STORE", "no se pudo borrar", null) } catch (_: Throwable) {} }
+                        }
+                    }
                     "openHealthSettings" -> result.success(openHealthSettings())
                     "healthLoad" -> ioExec.execute {
                         val out = try { BandClient.store.healthState() } catch (e: Throwable) { null }

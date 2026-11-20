@@ -3,6 +3,7 @@ import '../data/analysis.dart';
 import '../data/repo.dart';
 import '../theme/tokens.dart';
 import '../data/sports.dart';
+import 'delete_ui.dart';
 import 'night_cards.dart';
 import 'sport_picker.dart';
 import 'widgets.dart';
@@ -15,6 +16,7 @@ class ActivityPage extends StatefulWidget {
 
 class _ActivityPageState extends State<ActivityPage> {
   SportMode mode = sportByKey('OUTDOOR_RUNNING')!;
+  bool selecting = false; final sel = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +53,14 @@ class _ActivityPageState extends State<ActivityPage> {
       ])),
       WeeklyActivityCard(r),
       if (r.ageIsDefault) Note('Edad no indicada: el cómputo por pulso, las zonas y el TRIMP usan ${VigorRepo.defaultAge} años por defecto. Indícala en Dispositivo → Perfil.'),
-      const SectionHeader('Actividades guardadas'),
+      SectionHeader('Actividades guardadas', trailing: r.sessions.isEmpty ? null : TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: () => setState(() { selecting = !selecting; sel.clear(); }), child: Text(selecting ? 'Cancelar' : 'Seleccionar'))),
+      if (selecting) Panel(child: Row(children: [
+        Expanded(child: Text(sel.isEmpty ? 'Toca las sesiones que quieras borrar.' : '${sel.length} seleccionada(s)', style: VT.body(c))),
+        FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 48), backgroundColor: c.danger), onPressed: sel.isEmpty ? null : () async {
+          final keys = sel.toList(); final done = await confirmAndDelete(context, r, type: 'session', keys: keys, title: 'Borrar ${keys.length} sesión(es)', what: 'Se borrarán ${keys.length} sesiones deportivas, con su ruta y pulso por minuto.');
+          if (done && mounted) setState(() { selecting = false; sel.clear(); });
+        }, icon: const Icon(Icons.delete_outline), label: const Text('Borrar')),
+      ])),
       if (r.sessions.isEmpty) const SizedBox(height: 240, child: EmptyState(Icons.directions_run, 'Aún no hay actividades. Sincroniza la pulsera para leerlas.'))
       else for (final s in r.sessions) _tile(context, c, r, s),
       const Note('Calorías, distancia y ritmo los calcula la pulsera (algoritmo del fabricante).'),
@@ -63,9 +72,9 @@ class _ActivityPageState extends State<ActivityPage> {
     final trimp = s.hrPerMinute.isEmpty ? null : edwardsTrimp(zoneMinutes(s.hrPerMinute, hrMax));
     final m = sportById(s.sportType); final col = m == null ? c.exp : groupColor(c, m.group);
     final name = sportLabel(s.sportType); final when = '${s.start.year}-${two(s.start.month)}-${two(s.start.day)} ${hm(s.start)}';
-    return Panel(padding: EdgeInsets.zero, child: Semantics(button: true, label: '$name, $when, ${dur(s.seconds)}, ${(s.meters / 1000).toStringAsFixed(2)} kilómetros', child: ExcludeSemantics(child: InkWell(
+    return Panel(padding: EdgeInsets.zero, child: Semantics(button: true, selected: selecting && sel.contains(s.key), label: '${selecting ? (sel.contains(s.key) ? 'Seleccionada. ' : 'No seleccionada. ') : ''}$name, $when, ${dur(s.seconds)}, ${(s.meters / 1000).toStringAsFixed(2)} kilómetros', child: ExcludeSemantics(child: InkWell(
       borderRadius: BorderRadius.circular(24),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SessionPage(r, s))),
+      onTap: selecting ? () => setState(() { if (!sel.remove(s.key)) sel.add(s.key); }) : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SessionPage(r, s))),
       child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48), child: Padding(padding: const EdgeInsets.all(Sp.x4), child: Row(children: [
         CircleAvatar(radius: 22, backgroundColor: col.withValues(alpha: .2), child: Icon(sportIcon(s.sportType), color: col)), const SizedBox(width: Sp.x3),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -77,7 +86,7 @@ class _ActivityPageState extends State<ActivityPage> {
             if (s.avgHr > 0) _chip(c, Icons.favorite, '${s.avgHr} bpm', c.heart), if (trimp != null) _chip(c, Icons.speed, 'TRIMP $trimp'), if (s.hasGps && m?.tracksRoute != false) _chip(c, Icons.route, 'GPS', c.route),
           ]),
         ])),
-        const Icon(Icons.chevron_right),
+        selecting ? Icon(sel.contains(s.key) ? Icons.check_circle : Icons.radio_button_unchecked, color: sel.contains(s.key) ? c.accent : c.muted) : const Icon(Icons.chevron_right),
       ]))),
     ))));
   }
@@ -100,7 +109,9 @@ class SessionPage extends StatelessWidget {
     final cuts = s.route.where((p) => p.$1.isNaN).length;
     double? gpsDist; if (real > 1) { var d = 0.0; for (var i = 1; i < s.route.length; i++) { final a = s.route[i - 1], b = s.route[i]; if (a.$1.isNaN || b.$1.isNaN) continue; d += haversine(a.$1, a.$2, b.$1, b.$2); } gpsDist = d; }
     return Scaffold(
-      appBar: AppBar(title: Text(sportLabel(s.sportType))),
+      appBar: AppBar(title: Text(sportLabel(s.sportType)), actions: [
+        DeleteButton('Borrar esta sesión', () async { final done = await confirmAndDelete(context, repo, type: 'session', keys: [s.key], title: 'Borrar esta sesión', what: 'Se borrará la sesión de ${sportLabel(s.sportType)} del ${s.start.year}-${two(s.start.month)}-${two(s.start.day)} ${hm(s.start)}, con su ruta y su pulso por minuto.'); if (done && context.mounted) Navigator.of(context).pop(); }),
+      ]),
       body: ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [

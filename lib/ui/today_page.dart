@@ -6,6 +6,7 @@ import 'charts.dart';
 import 'fx.dart';
 import 'heart_ui.dart';
 import 'metrics.dart';
+import 'delete_ui.dart';
 import 'widgets.dart';
 
 class TodayPage extends StatefulWidget {
@@ -51,7 +52,10 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
     final now = DateTime.now(); final isToday = k == '${now.year}-${two(now.month)}-${two(now.day)}';
     final steps = isLast && isToday && r.liveSteps > d.steps ? r.liveSteps : d.steps;
     return RefreshIndicator(onRefresh: () async { await r.sync(); }, child: ListView(physics: lock ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
-      Text(_summary(d, r), style: VT.body(c).copyWith(color: c.muted)),
+      Row(children: [Expanded(child: Text(_summary(d, r), style: VT.body(c).copyWith(color: c.muted))),
+        PopupMenuButton<String>(tooltip: 'Opciones del día', constraints: const BoxConstraints(minWidth: 48), icon: const Icon(Icons.more_vert), onSelected: (_) => confirmAndDelete(context, r, type: 'day', keys: [k], title: 'Borrar los datos de este día', what: 'Se borrarán pasos, pulso, SpO₂, variabilidad y temperatura del $k. El sueño y los ejercicios se borran por separado.'),
+          itemBuilder: (_) => [PopupMenuItem(value: 'del', height: 48, child: Text('Borrar los datos de este día', style: TextStyle(color: c.danger)))]),
+      ]),
       const SizedBox(height: Sp.x3),
       _ribbon(c, r, keys, k),
       const SizedBox(height: Sp.x3),

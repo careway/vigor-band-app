@@ -6,6 +6,7 @@ import '../data/repo.dart';
 import '../data/sports.dart';
 import '../theme/tokens.dart';
 import 'about_page.dart';
+import 'delete_ui.dart';
 import 'health_page.dart';
 import 'widgets.dart';
 
@@ -215,7 +216,7 @@ class AgpsPage extends StatelessWidget {
 class PrivacyPage extends StatelessWidget {
   final VigorRepo repo; const PrivacyPage(this.repo, {super.key});
   @override
-  Widget build(BuildContext context) => SettingsScaffold('Privacidad y datos', [PrivacyPanel(repo)]);
+  Widget build(BuildContext context) => SettingsScaffold('Privacidad y datos', [PrivacyPanel(repo), ManageDataPanel(repo)]);
 }
 
 class AppearancePage extends StatelessWidget {
