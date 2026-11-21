@@ -95,7 +95,7 @@ void main() {
     testWidgets('recorrido: ruta, ritmo y distancia', (t) async {
       await pump(t, SessionPage(VigorRepo(), sess(1, gps: true)), size: const Size(360, 3000));
       expect(find.text('Ritmo medio'), findsOneWidget);
-      expect(find.text('Ruta GPS de la pulsera'), findsOneWidget);
+      expect(find.text('Ruta'), findsOneWidget); // panel de ruta (mapa o dibujo) con su selector Suavizada/Original
     });
   });
 

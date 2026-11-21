@@ -11,6 +11,8 @@ import 'heart_meter.dart';
 import 'live_heart.dart';
 import 'updater.dart';
 import 'sleep_stages.dart';
+import 'gps_filter.dart';
+import 'map_style.dart';
 import 'sports.dart';
 export 'sleep_stages.dart';
 export 'analysis.dart' show Sample;
@@ -47,7 +49,9 @@ class Night {
 class Session {
   final String key; final DateTime start; final int sportType, seconds, meters, steps, avgHr, paceSecKm; final double kcal; final bool hasGps;
   final List<(double, double)> route; final List<int> hrPerMinute;
-  Session({required this.key, required this.start, required this.sportType, required this.seconds, required this.meters, required this.kcal, required this.steps, required this.avgHr, required this.paceSecKm, required this.hasGps, required this.route, required this.hrPerMinute});
+  /// Puntos GPS con su instante (s desde el inicio) y su señal; vacío si la sesión no los trae. [route] es lo mismo sin tiempo ni señal.
+  final List<GpsFix> fixes;
+  Session({required this.key, required this.start, required this.sportType, required this.seconds, required this.meters, required this.kcal, required this.steps, required this.avgHr, required this.paceSecKm, required this.hasGps, required this.route, required this.hrPerMinute, this.fixes = const []});
 }
 
 String sportName(int t) => sportLabel(t);
@@ -139,6 +143,12 @@ class VigorRepo extends ChangeNotifier {
   /// true entre pedir un deporte y detenerlo/desconectar (conservador: durante él no se mide el pulso en vivo).
   bool sportActive = false;
   bool liveOn = true; int liveSec = 10;
+  /// Mapa de fondo de OpenStreetMap en las rutas (descarga teselas de openstreetmap.org; apagado = solo la ruta dibujada).
+  bool mapOn = true;
+  /// Aspecto del mapa (ver [MapStyle]); por defecto, el moderno.
+  MapStyle mapStyle = MapStyle.byDefault;
+  Future<void> setMapStyle(MapStyle v) async { mapStyle = v; await _m.invokeMethod('setPref', {'key': 'mapStyle', 'value': v.index}); notifyListeners(); }
+  Future<void> setMapOn(bool v) async { mapOn = v; await _m.invokeMethod('setPref', {'key': 'mapOn', 'value': v ? 1 : 0}); notifyListeners(); }
   Future<void> setLiveOn(bool v) async { liveOn = v; live.setEnabled(v); await _m.invokeMethod('setPref', {'key': 'liveOn', 'value': v ? 1 : 0}); notifyListeners(); }
   Future<void> setLiveSec(int v) async { if (!LiveHeart.allowedIntervals.contains(v)) return; liveSec = v; live.setInterval(v); await _m.invokeMethod('setPref', {'key': 'liveSec', 'value': v}); notifyListeners(); }
 
@@ -184,7 +194,7 @@ class VigorRepo extends ChangeNotifier {
       age = ageIsDefault ? defaultAge : a as int;
       final g = p['goal']; if (g is int) stepGoal = g.clamp(1000, 40000);
       showExperimental = p['exp'] == 1;
-      liveOn = p['liveOn'] != 0; final ls = p['liveSec']; liveSec = ls is int && LiveHeart.allowedIntervals.contains(ls) ? ls : 10;
+      mapOn = p['mapOn'] != 0; mapStyle = MapStyle.fromIndex(p['mapStyle']); liveOn = p['liveOn'] != 0; final ls = p['liveSec']; liveSec = ls is int && LiveHeart.allowedIntervals.contains(ls) ? ls : 10;
       live.setEnabled(liveOn); live.setInterval(liveSec);
       themeMode = ((p['theme'] as num?)?.toInt() ?? 0).clamp(0, 2);
       healthPrefs = Map<dynamic, dynamic>.from(p);
@@ -407,19 +417,21 @@ class VigorRepo extends ChangeNotifier {
       final key = o['_key']; final start = _t(o['startTime']);
       if (key is! String || start == null || _n(o['sportTime']) <= 0) continue; // sin hora de inicio fiable no se inventa una sesión
       final its = items[key]?['items'] is List ? items[key]!['items'] as List : const [];
-      final route = <(double, double)>[]; final hrs = <int>[];
+      final route = <(double, double)>[]; final hrs = <int>[]; final fixes = <GpsFix>[]; var minuteIdx = 0, seq = 0;
       for (final it in its) {
         if (it is! Map) continue;
+        final mi = _n(it['minute']).toInt(); minuteIdx = mi > 0 ? mi - 1 : seq; seq++; // cada elemento es 1 minuto de la sesión; 12 puntos, uno cada 5 s
+        final sg = it['signalArray'] is List ? it['signalArray'] as List : const [];
         final la = it['latArray'] is List ? it['latArray'] as List : const [], lo = it['lngArray'] is List ? it['lngArray'] as List : const [];
         for (var i = 0; i < la.length && i < lo.length; i++) {
           final a = _n(la[i]).toDouble(), b = _n(lo[i]).toDouble();
-          if (a != 0 || b != 0) { route.add((a, b)); }
+          if (a != 0 || b != 0) { route.add((a, b)); fixes.add(GpsFix(a, b, minuteIdx * 60 + i * 5, i < sg.length ? _n(sg[i]).toInt() : 2)); }
           else if (route.isNotEmpty && !route.last.$1.isNaN) { route.add((double.nan, double.nan)); } // corte: sin fix GPS
         }
         final r = _n(it['rate']).toInt(); if (r >= 30 && r <= 220) hrs.add(r);
       }
       sessions.add(Session(key: key, start: start, sportType: _n(o['sportType']).toInt(), seconds: _n(o['sportTime']).toInt(), meters: _n(o['distance']).toInt(),
-        kcal: _n(o['calories']) / 1000, steps: _n(o['stepCount']).toInt(), avgHr: _n(o['avgHeartRate'] ?? o['averRate']).toInt(), paceSecKm: _n(o['avgPace']).toInt(), hasGps: o['hasGpsInfo'] == true, route: route, hrPerMinute: hrs));
+        kcal: _n(o['calories']) / 1000, steps: _n(o['stepCount']).toInt(), avgHr: _n(o['avgHeartRate'] ?? o['averRate']).toInt(), paceSecKm: _n(o['avgPace']).toInt(), hasGps: o['hasGpsInfo'] == true, route: route, hrPerMinute: hrs, fixes: fixes));
     } catch (_) {} }
     sessions.sort((a, b) => b.start.compareTo(a.start));
 

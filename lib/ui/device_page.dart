@@ -10,6 +10,8 @@ import 'about_page.dart';
 import 'delete_ui.dart';
 import 'health_page.dart';
 import 'system_settings_panel.dart';
+import '../data/map_style.dart';
+import 'route_map.dart';
 import 'widgets.dart';
 
 /// Ajustes: pantalla principal con categorías; cada una abre su subpantalla.
@@ -219,7 +221,7 @@ class AgpsPage extends StatelessWidget {
 class PrivacyPage extends StatelessWidget {
   final VigorRepo repo; const PrivacyPage(this.repo, {super.key});
   @override
-  Widget build(BuildContext context) => SettingsScaffold('Privacidad y datos', [PrivacyPanel(repo), ManageDataPanel(repo)]);
+  Widget build(BuildContext context) => SettingsScaffold('Privacidad y datos', [MapSettingPanel(repo), PrivacyPanel(repo), ManageDataPanel(repo)]);
 }
 
 class AppearancePage extends StatelessWidget {
@@ -335,5 +337,54 @@ class SyncSettingsPage extends StatelessWidget {
       SystemSettingsPanel(r),
       const Note('La sincronización en segundo plano se ha comprobado con la pulsera real en un solo móvil (Xiaomi, Android 10) y una sola vez. El sistema decide cuándo ejecutarla: el intervalo mínimo de Android es de 15 min y puede retrasarse.'),
     ]);
+  }
+}
+
+
+/// Mapa de fondo de las rutas: interruptor y aspecto. Apagado: no se descarga ningún mapa y la ruta se dibuja sola.
+/// Ruta de ejemplo para la vista previa (un paseo inventado alrededor de un punto fijo; NO es tu ubicación).
+const List<(double, double)> kPreviewRoute = [
+  (40.41700, -3.68500), (40.41760, -3.68410), (40.41850, -3.68350), (40.41960, -3.68340), (40.42050, -3.68400), (40.42090, -3.68510),
+  (40.42050, -3.68620), (40.41960, -3.68690), (40.41850, -3.68680), (40.41760, -3.68620), (40.41700, -3.68520),
+];
+
+class MapSettingPanel extends StatefulWidget {
+  final VigorRepo repo; final bool preview; const MapSettingPanel(this.repo, {super.key, this.preview = true});
+  @override
+  State<MapSettingPanel> createState() => _MapSettingPanelState();
+}
+
+class _MapSettingPanelState extends State<MapSettingPanel> {
+  bool _showPreview = false; // la vista previa descarga mapa: solo si se pide
+  @override
+  Widget build(BuildContext context) {
+    final repo = widget.repo;
+    return ListenableBuilder(listenable: repo, builder: (context, _) {
+      final c = VC.of(context);
+      return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Mapa de fondo', style: VT.heading(c)),
+            Text(repo.mapOn ? 'Las rutas se muestran sobre un mapa. Se pide la zona a su servidor, nunca tus datos.' : 'Apagado: no se descarga ningún mapa y la ruta se dibuja sola.', style: VT.caption(c)),
+          ])),
+          Semantics(label: 'Mapa de fondo', child: Switch(value: repo.mapOn, onChanged: repo.setMapOn)),
+        ]),
+        if (repo.mapOn) ...[
+          const SizedBox(height: Sp.x3), Text('Aspecto', style: VT.caption(c)), const SizedBox(height: Sp.x2),
+          Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
+            for (final m in MapStyle.values) Semantics(button: true, selected: repo.mapStyle == m, label: '${m.label}. ${m.hint}', child: ExcludeSemantics(child: ChoiceChip(
+                label: Text(m.label), selected: repo.mapStyle == m, onSelected: (_) => repo.setMapStyle(m), materialTapTargetSize: MaterialTapTargetSize.padded, visualDensity: VisualDensity.standard))),
+          ]),
+          Padding(padding: const EdgeInsets.only(top: Sp.x2), child: Text(repo.mapStyle.hint, style: VT.caption(c))),
+          if (widget.preview) ...[
+            if (!_showPreview) Align(alignment: Alignment.centerLeft, child: TextButton.icon(style: TextButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: () => setState(() => _showPreview = true), icon: const Icon(Icons.map_outlined), label: const Text('Ver vista previa')))
+            else Padding(padding: const EdgeInsets.only(top: Sp.x3), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              RouteMap(const [kPreviewRoute], style: repo.mapStyle, height: 190),
+              Padding(padding: const EdgeInsets.only(top: Sp.x1), child: Text('Vista previa con una ruta de ejemplo', style: VT.caption(c))),
+            ])),
+          ],
+        ],
+      ]));
+    });
   }
 }

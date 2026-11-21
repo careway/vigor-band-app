@@ -5,6 +5,7 @@ import '../theme/tokens.dart';
 import '../data/sports.dart';
 import 'delete_ui.dart';
 import 'night_cards.dart';
+import 'route_panel.dart';
 import 'sport_menu.dart';
 import 'sport_picker.dart';
 import 'widgets.dart';
@@ -158,9 +159,6 @@ class SessionPage extends StatelessWidget {
     final dv = deriveSession(s.seconds, s.meters, s.paceSecKm);
     final hm0 = sportById(s.sportType); final hc = hm0 == null ? c.exp : groupColor(c, hm0.group);
     final indoor = hm0?.tracksRoute == false; // modo de interior / sin GPS: sin mapa, ritmo ni distancia por GPS
-    final real = s.route.where((p) => !p.$1.isNaN).length;
-    final cuts = s.route.where((p) => p.$1.isNaN).length;
-    double? gpsDist; if (real > 1) { var d = 0.0; for (var i = 1; i < s.route.length; i++) { final a = s.route[i - 1], b = s.route[i]; if (a.$1.isNaN || b.$1.isNaN) continue; d += haversine(a.$1, a.$2, b.$1, b.$2); } gpsDist = d; }
     return Scaffold(
       appBar: AppBar(title: Text(sportLabel(s.sportType)), actions: [
         DeleteButton('Borrar esta sesión', () async { final done = await confirmAndDelete(context, repo, type: 'session', keys: [s.key], title: 'Borrar esta sesión', what: 'Se borrará la sesión de ${sportLabel(s.sportType)} del ${s.start.year}-${two(s.start.month)}-${two(s.start.day)} ${hm(s.start)}, con su ruta y su pulso por minuto.'); if (done && context.mounted) Navigator.of(context).pop(); }),
@@ -188,14 +186,7 @@ class SessionPage extends StatelessWidget {
           if (!indoor && dv.paceDiffers) Note('Ritmo calculado distinto del de la pulsera: ${pace(dv.paceSecKm!)} frente a ${pace(s.paceSecKm)}. Se muestra el de la pulsera.'),
           Note(indoor ? 'Modo de interior: sin GPS. Las calorías y el pulso los calcula la pulsera (algoritmo del fabricante); el número de series o repeticiones no está disponible en la SDK que usa Vigor (no verificado).' : 'Distancia, calorías y ritmo los calcula la pulsera; la distancia por GPS es solo una comprobación y puede acumular deriva en interiores.'),
         ])),
-        if (!indoor) Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          MetricHeader(Icons.route, 'Ruta GPS de la pulsera', c.route), const SizedBox(height: Sp.x3),
-          if (real < 2) Text(s.hasGps ? 'La pulsera no obtuvo posición suficiente (¿interior o sin cielo abierto?).' : 'Esta actividad no tiene GPS.', style: VT.body(c).copyWith(color: c.muted))
-          else ...[
-            SizedBox(height: 240, child: CustomPaint(size: Size.infinite, painter: RoutePainter(s.route, c.route, c.kcal, c.surface))),
-            Note('$real puntos · $cuts cortes sin señal · distancia por GPS ≈ ${gpsDist!.round()} m (la pulsera informa ${s.meters} m). Sin suavizado; los tramos sin posición no se unen.'),
-          ],
-        ])),
+        if (!indoor) RoutePanel(repo, s),
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           MetricHeader(Icons.favorite, 'Pulso y zonas', c.heart), const SizedBox(height: Sp.x3),
           if (s.hrPerMinute.length < 2) Text('Sin lecturas de pulso.', style: VT.body(c).copyWith(color: c.muted)) else ...[

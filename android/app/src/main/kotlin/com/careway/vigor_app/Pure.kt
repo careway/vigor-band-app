@@ -109,3 +109,9 @@ object UpdateRules {
     /** El APK debe ser de este paquete y de una version mayor que la instalada. */
     fun acceptable(ownPkg: String, pkg: String?, installed: Long, candidate: Long) = pkg == ownPkg && candidate > installed
 }
+
+/** Enlaces que la app abre en el navegador: solo https y solo estos sitios (descargas de GitHub y la atribucion de OpenStreetMap). */
+object OpenUrlRules {
+    private val HOSTS = setOf("github.com", "www.openstreetmap.org")
+    fun allowed(scheme: String?, host: String?) = scheme == "https" && host != null && host in HOSTS
+}

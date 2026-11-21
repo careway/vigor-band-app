@@ -157,7 +157,7 @@ class MainActivity : FlutterFragmentActivity() {
                     "cleanUpdates" -> { try { updateDir().deleteRecursively() } catch (_: Throwable) {}; result.success(null) }
                     "openUrl" -> {
                         val u = android.net.Uri.parse(call.argument<String>("url") ?: "")
-                        if (u.scheme == "https" && u.host == "github.com") { startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE)); result.success(true) } else result.success(false)
+                        if (OpenUrlRules.allowed(u.scheme, u.host)) { startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE)); result.success(true) } else result.success(false)
                     }
                     "installApk" -> result.success(installApk(call.argument<String>("name")))
                     "isConnected" -> result.success(BandClient.connected)
