@@ -1,5 +1,4 @@
 // DEV_012: sincronización automática con la app abierta (lógica pura con reloj simulado) y exportación sin interfaz.
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vigor_app/background_export.dart';
 import 'package:vigor_app/data/auto_sync.dart';
