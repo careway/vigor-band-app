@@ -20,7 +20,7 @@ void main() {
       switch (c.method) {
         case 'permissionStatus': return status;
         case 'requestPermissions': return true;
-        case 'openBatterySettings': return true;
+        case 'openSystemSetting': return 'details';
         default: return null;
       }
     });
@@ -83,7 +83,7 @@ void main() {
       expect(find.text('Abrir ajustes'), findsOneWidget);
       expect(find.textContaining('Android ya no mostrará'), findsOneWidget);
       await t.tap(find.text('Abrir ajustes')); await t.pumpAndSettle();
-      expect(calls.contains('openBatterySettings'), true); expect(calls.contains('requestPermissions'), false);
+      expect(calls.contains('openSystemSetting'), true); expect(calls.contains('requestPermissions'), false);
       repo.auto.dispose();
     });
 

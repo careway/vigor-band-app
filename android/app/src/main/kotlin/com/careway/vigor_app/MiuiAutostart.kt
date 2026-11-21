@@ -16,6 +16,9 @@ object MiuiAutostart {
     private val BRANDS = setOf("xiaomi", "redmi", "poco")
     private fun component() = ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
 
+    /** Modo de AppOps → permitido? MODE_ALLOWED (0) sí; MODE_IGNORED (1) y MODE_ERRORED (2) no; cualquier otro valor o nulo: desconocido. */
+    fun interpret(mode: Int?): Boolean? = when (mode) { 0 -> true; 1, 2 -> false; else -> null }
+
     fun isXiaomiBrand(manufacturer: String?): Boolean = (manufacturer ?: "").lowercase() in BRANDS
 
     fun supported(ctx: Context): Boolean {

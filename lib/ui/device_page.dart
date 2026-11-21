@@ -9,6 +9,7 @@ import '../theme/tokens.dart';
 import 'about_page.dart';
 import 'delete_ui.dart';
 import 'health_page.dart';
+import 'system_settings_panel.dart';
 import 'widgets.dart';
 
 /// Ajustes: pantalla principal con categorías; cada una abre su subpantalla.
@@ -331,18 +332,7 @@ class SyncSettingsPage extends StatelessWidget {
         FilledButton.icon(onPressed: ok && !r.syncing ? r.sync : null, icon: const Icon(Icons.sync), label: const Text('Sincronizar ahora')),
         if (!ok) const Note('Conecta la pulsera para sincronizar a mano.'),
       ])),
-      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Ahorro de batería del móvil', style: VT.heading(c)),
-        const Note('En Xiaomi/MIUI y otras marcas el sistema puede cerrar o retrasar las tareas en segundo plano. Sin una excepción de batería para Vigor, la sincronización con la app cerrada puede retrasarse o no ocurrir. Vigor no la pide por su cuenta: si quieres, ábrela tú.'),
-        const SizedBox(height: Sp.x2),
-        OutlinedButton.icon(onPressed: r.openBatterySettings, icon: const Icon(Icons.battery_saver_outlined), label: const Text('Ajustes de batería')),
-        FutureBuilder<bool>(future: r.autostartSupported(), builder: (_, snap) => snap.data != true ? const SizedBox.shrink() : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SizedBox(height: Sp.x3),
-          const Note('En Xiaomi hace falta además permitir el «Inicio automático» de Vigor: sin él el sistema no deja arrancar la app cerrada para sincronizar, y no se sincroniza nada hasta que la abras.'),
-          const SizedBox(height: Sp.x2),
-          OutlinedButton.icon(onPressed: r.openAutostartSettings, icon: const Icon(Icons.rocket_launch_outlined), label: const Text('Inicio automático (Xiaomi)')),
-        ])),
-      ])),
+      SystemSettingsPanel(r),
       const Note('La sincronización en segundo plano se ha comprobado con la pulsera real en un solo móvil (Xiaomi, Android 10) y una sola vez. El sistema decide cuándo ejecutarla: el intervalo mínimo de Android es de 15 min y puede retrasarse.'),
     ]);
   }

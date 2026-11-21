@@ -54,7 +54,8 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: Sp.x3),
             Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
               SizedBox(height: 48, child: OutlinedButton(onPressed: busy ? null : () => u.check(), child: const Text('Buscar actualizaciones'))),
-              if (u.available && u.state != UpdateState.downloading) SizedBox(height: 48, child: FilledButton(onPressed: u.install, child: const Text('Actualizar'))),
+              if (u.available && u.state == UpdateState.needsPermission) SizedBox(height: 48, child: FilledButton.icon(onPressed: u.askInstallPermission, icon: const Icon(Icons.security_outlined), label: const Text('Permitir instalar'))),
+              if (u.available && u.state != UpdateState.downloading && u.state != UpdateState.needsPermission) SizedBox(height: 48, child: FilledButton(onPressed: u.install, child: const Text('Actualizar'))),
               if (u.failure != null && u.failure != UpdateFail.offline) SizedBox(height: 48, child: OutlinedButton(onPressed: () async { if (!await u.openReleases() && context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el navegador. Visita: $kReleasesPage'))); }, child: const Text('Abrir página de versiones'))),
               if (u.state == UpdateState.downloading) SizedBox(height: 48, child: OutlinedButton(onPressed: u.cancelDownload, child: const Text('Cancelar'))),
             ]),

@@ -127,7 +127,12 @@ class Updater extends ChangeNotifier {
   }
 
   /// Al volver a primer plano: comprueba en silencio si han pasado >= 15 min desde la última (nunca dos a la vez).
-  Future<void> onResume() async { if (installed != null && shouldCheck(clock(), lastCheck)) await check(silent: true); }
+  Future<void> onResume() async {
+    if (_resumeInstall && state == UpdateState.needsPermission) {
+      if (await canInstallApps()) { _resumeInstall = false; unawaited(install()); return; } // ya lo permitió: sigue con la descarga
+    }
+    if (installed != null && shouldCheck(clock(), lastCheck)) await check(silent: true);
+  }
 
   /// "Más tarde": silencia el aviso para esta versión (se guarda); si sale otra más nueva, vuelve a avisar.
   void later() {
@@ -139,9 +144,22 @@ class Updater extends ChangeNotifier {
   Future<bool> openReleases() async { try { return await _m.invokeMethod<bool>('openUrl', {'url': kReleasesPage}) ?? false; } catch (_) { return false; } }
   void cancelDownload() { _cancel = true; }
 
+  bool _resumeInstall = false; // se pidió el permiso antes de descargar: al volver a la app se continúa sola
+  Future<bool> canInstallApps() async { try { return await _m.invokeMethod<bool>('canInstallApps') ?? true; } catch (_) { return true; } }
+  /// Botón «Permitir instalar»: abre la pantalla del sistema de Vigor (instalar apps desconocidas). Al volver, la actualización continúa sola.
+  Future<void> askInstallPermission() async { _resumeInstall = true; try { await _m.invokeMethod('openSystemSetting', {'which': 'installApps'}); } catch (_) {} }
+
   /// Descarga, verifica y abre el instalador del sistema. Nada se ejecuta sin la confirmación del instalador de Android.
   Future<void> install() async {
     final i = info; if (i == null || state == UpdateState.downloading) return;
+    // ANTES de descargar nada: ¿puede Vigor instalar apps? Si no, se pide primero (una sola vez) y la actualización continúa sola al volver.
+    // Así nunca se descarga para luego descubrir que falta el permiso (y volver a pedirlo).
+    if (!await canInstallApps()) {
+      state = UpdateState.needsPermission; _resumeInstall = true;
+      message = 'Para actualizar, Android necesita que permitas a Vigor instalar apps. Se pide una sola vez y antes de descargar nada; al volver, la actualización sigue sola.';
+      notifyListeners(); return;
+    }
+    _resumeInstall = false;
     final prev = state; state = UpdateState.downloading; progress = 0; message = null; _cancel = false; notifyListeners();
     File? part;
     try {

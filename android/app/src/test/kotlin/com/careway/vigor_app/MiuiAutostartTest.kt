@@ -11,4 +11,9 @@ class MiuiAutostartTest {
     @Test fun other_brands_and_null_are_not_xiaomi() {
         assertFalse(MiuiAutostart.isXiaomiBrand("samsung")); assertFalse(MiuiAutostart.isXiaomiBrand("")); assertFalse(MiuiAutostart.isXiaomiBrand(null))
     }
+    @Test fun appops_mode_is_interpreted() {
+        assertTrue(MiuiAutostart.interpret(0) == true)
+        assertTrue(MiuiAutostart.interpret(1) == false); assertTrue(MiuiAutostart.interpret(2) == false)
+        assertTrue(MiuiAutostart.interpret(3) == null); assertTrue(MiuiAutostart.interpret(null) == null)
+    }
 }

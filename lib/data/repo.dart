@@ -6,6 +6,7 @@ import 'analysis.dart';
 import 'auto_sync.dart';
 import 'health_gateway.dart';
 import 'health_sync.dart';
+import 'startup_permissions.dart';
 import 'heart_meter.dart';
 import 'live_heart.dart';
 import 'updater.dart';
@@ -154,6 +155,18 @@ class VigorRepo extends ChangeNotifier {
       return (missing: [for (final x in (r?['missing'] as List? ?? const [])) x.toString()], blocked: r?['blocked'] == true);
     } catch (_) { return (missing: <String>[], blocked: false); }
   }
+  /// Consulta (sin conceder nada) los ajustes del sistema que importan: instalar apps, excepción de batería e inicio automático de Xiaomi.
+  Future<SystemSettingsStatus> systemSettings() async {
+    try {
+      final r = await _m.invokeMethod<Map>('systemSettingsStatus');
+      if (r == null) return SystemSettingsStatus.unknown;
+      return SystemSettingsStatus(installApps: r['installApps'] != false, batteryUnrestricted: r['batteryUnrestricted'] != false,
+          autostart: r['autostart'] is bool ? r['autostart'] as bool : null, xiaomi: r['xiaomi'] == true);
+    } catch (_) { return SystemSettingsStatus.unknown; }
+  }
+  /// Abre la pantalla del sistema de [which] ('installApps' | 'battery' | 'autostart').
+  Future<void> openSystemSetting(String which) async { try { await _m.invokeMethod('openSystemSetting', {'which': which}); } catch (_) {} }
+
   /// Lanza el diálogo del sistema para Bluetooth/ubicación y anota que ya se pidió (para detectar «no volver a preguntar»).
   Future<bool> requestStartupPermissions() async {
     final ok = await _perm(true);
