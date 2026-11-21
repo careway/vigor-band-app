@@ -9,7 +9,6 @@ import 'charts.dart';
 import 'fx.dart';
 import 'heart_ui.dart';
 import 'metrics.dart';
-import 'delete_ui.dart';
 import 'widgets.dart';
 
 class TodayPage extends StatefulWidget {
@@ -33,14 +32,6 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
       transitionDuration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 350),
       pageBuilder: (_, a, _) => FadeTransition(opacity: a, child: MetricDetailPage(widget.repo, s, k))));
 
-  String _summary(Day d, VigorRepo r) {
-    final p = <String>[];
-    final steps = d.steps.round(); if (steps > 0) p.add('${steps.toString()} pasos');
-    final hr = statsOf(d.hr); if (hr != null) p.add('pulso medio ${hr.avg.round()} bpm');
-    final ox = statsOf(d.spo2); if (ox != null) p.add('SpO₂ ${ox.avg.round()} %');
-    return p.isEmpty ? 'Sin datos registrados este día.' : p.join(' · ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = VC.of(context); final r = widget.repo; final keys = r.dayKeys;
@@ -55,10 +46,6 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
     final now = DateTime.now(); final isToday = k == '${now.year}-${two(now.month)}-${two(now.day)}';
     final steps = isLast && isToday && r.liveSteps > d.steps ? r.liveSteps : d.steps;
     return RefreshIndicator(onRefresh: () async { await r.sync(); }, child: ListView(physics: lock ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
-      Row(children: [Expanded(child: Text(_summary(d, r), style: VT.body(c).copyWith(color: c.muted))),
-        PopupMenuButton<String>(tooltip: 'Opciones del día', constraints: const BoxConstraints(minWidth: 48), icon: const Icon(Icons.more_vert), onSelected: (_) => confirmAndDelete(context, r, type: 'day', keys: [k], title: 'Borrar los datos de este día', what: 'Se borrarán pasos, pulso, SpO₂, variabilidad y temperatura del $k. El sueño y los ejercicios se borran por separado.'),
-          itemBuilder: (_) => [PopupMenuItem(value: 'del', height: 48, child: Text('Borrar los datos de este día', style: TextStyle(color: c.danger)))]),
-      ]),
       Semantics(liveRegion: false, child: Text(r.syncing ? 'Sincronizando…' : syncAgoText(r.lastSync, r.clock()), style: VT.caption(c))),
       const SizedBox(height: Sp.x3),
       _ribbon(c, r, keys, k),
@@ -76,8 +63,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
       }),
       const SizedBox(height: Sp.x4),
       if (r.showExperimental) _experimental(c, d, k),
-      if (r.ageIsDefault && d.hr.isNotEmpty) Note('Edad no indicada: el color del resplandor inferior usa la FCmáx de ${VigorRepo.defaultAge} años por defecto. Indica tu edad en Dispositivo → Perfil.'),
-      const Note('Fuentes y límites de cada análisis: docs/ANALISIS.md'),
+      if (r.ageIsDefault && d.hr.isNotEmpty) Note('Indica tu edad en Ajustes → Perfil para ajustar las zonas de pulso.'),
     ]));
   }
 
@@ -293,7 +279,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
             Stat('Ácido úrico', '${_f(blood.$2['uricAcid'], 0)} µmol/L'), Stat('Colesterol total', '${_f(blood.$2['tCHO'], 2)} mmol/L'), Stat('Triglicéridos', '${_f(blood.$2['tAG'], 2)} mmol/L'),
             Stat('HDL', '${_f(blood.$2['hDL'], 2)} mmol/L'), Stat('LDL', '${_f(blood.$2['lDL'], 2)} mmol/L'),
           ]),
-          if (blood != null) Note('Lectura de las ${hm(blood.$1)}. Sin rangos ni interpretación a propósito.'),
+          if (blood != null) Note('Lectura de las ${hm(blood.$1)}.'),
         ])),
       ],
     ]);
@@ -323,7 +309,7 @@ Future<void> showFindBandSheet(BuildContext context, VigorRepo r) async {
         subtitle: Text('${maskMac(d['mac']?.toString())} · ${d['rssi']} dBm'),
         onTap: () async { await r.connect(d['mac'].toString()); if (ctx.mounted) Navigator.of(ctx).pop(); }))),
       if (r.conn != 'scanning' && r.conn != 'connecting') Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: r.scan, icon: const Icon(Icons.refresh), label: const Text('Buscar de nuevo'))),
-      const Note('Acerca la pulsera al móvil y activa el Bluetooth. En Android 11 o anterior hace falta tener la ubicación activada solo para esta búsqueda.'),
+      const Note('Acerca la pulsera al móvil y activa el Bluetooth.'),
     ])));
   }));
   try { await r.stopScan(); } catch (_) {}

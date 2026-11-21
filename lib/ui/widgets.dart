@@ -11,11 +11,11 @@ class Panel extends StatelessWidget {
 }
 
 class MetricHeader extends StatelessWidget {
-  final IconData icon; final String label; final Color color;
-  const MetricHeader(this.icon, this.label, this.color, {super.key});
+  final IconData icon; final String label; final Color color; final Widget? trailing;
+  const MetricHeader(this.icon, this.label, this.color, {super.key, this.trailing});
   @override
   Widget build(BuildContext context) => Row(children: [
-        Icon(icon, size: 18, color: color), const SizedBox(width: Sp.x2), Flexible(child: Text(label, style: VT.heading(VC.of(context))))]);
+        Icon(icon, size: 18, color: color), const SizedBox(width: Sp.x2), Expanded(child: Text(label, style: VT.heading(VC.of(context)))), ?trailing]);
 }
 
 class BigValue extends StatelessWidget {
@@ -55,6 +55,21 @@ class Note extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: Sp.x2), child: Text(text, style: VT.caption(VC.of(context))));
 }
+
+/// Botón ⓘ discreto: abre una hoja inferior con la explicación (metodología, fuentes, límites).
+class InfoButton extends StatelessWidget {
+  final String title, text; const InfoButton(this.title, this.text, {super.key});
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'Más información: $title', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        icon: Icon(Icons.info_outline, size: 20, color: VC.of(context).muted),
+        onPressed: () => showInfoSheet(context, title, text));
+}
+
+Future<void> showInfoSheet(BuildContext context, String title, String text) => showModalBottomSheet<void>(
+    context: context, isScrollControlled: true, showDragHandle: true,
+    builder: (ctx) { final c = VC.of(ctx); return SafeArea(child: ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .8), child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4), children: [
+      Text(title, style: VT.heading(c)), const SizedBox(height: Sp.x2), Text(text, style: VT.body(c))]))); });
 
 class SectionHeader extends StatelessWidget {
   final String text; final Widget? trailing; const SectionHeader(this.text, {super.key, this.trailing});

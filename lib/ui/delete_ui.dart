@@ -47,7 +47,7 @@ class ManageDataPanel extends StatelessWidget {
     final btn = OutlinedButton.styleFrom(minimumSize: const Size(48, 48), foregroundColor: c.danger, side: BorderSide(color: c.danger.withValues(alpha: .6)));
     return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Gestionar datos', style: VT.heading(c)),
-      const Note('Borra registros concretos de este móvil. La pulsera puede seguir guardándolos, pero Vigor los ignora al sincronizar. Cada borrado pide confirmación.'),
+      const Note('Borra registros de este móvil. Cada borrado pide confirmación.'),
       const SizedBox(height: Sp.x2),
       Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
         OutlinedButton(style: btn, onPressed: r.nights.isEmpty ? null : () => confirmAndDelete(context, r, type: 'sleep', keys: [for (final n in r.nights) n.date], title: 'Borrar todas las noches', what: 'Se borrarán las ${r.nights.length} noches de sueño guardadas.'), child: Text('Sueño: todas las noches (${r.nights.length})')),

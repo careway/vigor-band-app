@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vigor_app/ui/widgets.dart';
 import 'package:vigor_app/data/analysis.dart';
 import 'package:vigor_app/data/repo.dart';
 import 'package:vigor_app/theme/tokens.dart';
@@ -208,7 +209,7 @@ void main() {
       final r = await load({'origin5': [{'mTime': _t(2026, 3, 5, 9, 0), 'bloodGlucose': 5.5, 'ppgs': [70, 71, 72, 73, 74]}]}, now: DateTime(2026, 3, 5, 12));
       expect(r.days['2026-03-05']!.glucose, isNotEmpty); // el dato existe, pero no se muestra
       await pump(t, ListenableBuilder(listenable: r, builder: (_, _) => TodayPage(r)));
-      await t.scrollUntilVisible(find.textContaining('Fuentes y límites de cada análisis'), 400, scrollable: find.byType(Scrollable).first); // el final de la lista esta construido
+      await t.drag(find.byType(Scrollable).first, const Offset(0, -3000)); await t.pump(); // el final de la lista esta construido
       expect(find.textContaining('Experimental'), findsNothing); expect(find.textContaining('Glucosa'), findsNothing);
       r.showExperimental = true; r.notifyListeners(); await t.pumpAndSettle();
       await t.scrollUntilVisible(find.text('Experimental · no fiable'), 400, scrollable: find.byType(Scrollable).first);
@@ -240,9 +241,13 @@ void main() {
       await pump(t, ListView(children: [RestingNightCard(r, '2026-03-08'), HrvNightCard(r, '2026-03-08')]));
       expect(find.bySemanticsLabel(RegExp(r'^Pulso en reposo \(noche, aprox\.\): 58 lpm\. \+4 lpm frente a tu mediana de 7 noches$')), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(r'^Variabilidad nocturna \(aprox\.\): 20 ms\. 0 ms frente a tu mediana de 7 noches$')), findsOneWidget);
-      expect(find.text('Noche = 00:00–06:00 (aprox.)'), findsNWidgets(2));
-      expect(find.text('Estimado con las lecturas más bajas de 00:00 a 06:00. Sirve para ver tu tendencia, no es una puntuación de recuperación ni un dato médico.'), findsOneWidget);
-      expect(find.text(hrvLimitText), findsOneWidget);
+      expect(find.byType(InfoButton), findsNWidgets(2)); // la explicación va detrás de ⓘ, no fija
+      expect(find.textContaining('Noche = 00:00'), findsNothing);
+      await t.tap(find.byType(InfoButton).at(0)); await t.pumpAndSettle();
+      expect(find.text('Noche = 00:00–06:00 (aprox.). Estimado con las lecturas más bajas de ese tramo. Sirve para ver tu tendencia, no es una puntuación de recuperación ni un dato médico.'), findsOneWidget);
+      await t.tapAt(const Offset(5, 5)); await t.pumpAndSettle();
+      await t.tap(find.byType(InfoButton).at(1)); await t.pumpAndSettle();
+      expect(find.textContaining(hrvLimitText), findsOneWidget);
       h.dispose();
     });
     testWidgets('tarjeta E2: con 5 noches previas dice "Aun sin linea base: 5 de 7 noches"; sin lecturas "Sin datos esta noche."', (t) async {

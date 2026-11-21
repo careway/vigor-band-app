@@ -55,16 +55,14 @@ class _ActivityPageState extends State<ActivityPage> {
           Expanded(flex: 2, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(minimumSize: const Size(48, 52)), onPressed: ok ? r.stopSport : null, icon: const Icon(Icons.stop), label: const Text('Detener'))),
         ]),
         if (!ok) const Note('Conecta la pulsera para iniciar una actividad.'),
-        Note(cur.tracksRoute ? 'Modo de recorrido: la pulsera graba sola, con su propio GPS si el modo lo usa (no verificado por modo); luego verás ruta, distancia y ritmo.' : 'Modo de interior: sin GPS; verás duración, pulso y calorías.'),
-        const Note('La SDK no indica qué modos admite tu pulsera: si no admite el elegido, no empezará.'),
+        Align(alignment: Alignment.centerRight, child: InfoButton('Sobre las actividades', 'Los modos con recorrido graban con el GPS de la pulsera (no verificado por modo); los de interior no usan GPS. La SDK no indica qué modos admite tu pulsera: si no admite el elegido, no empezará. Calorías, distancia y ritmo los calcula la pulsera.')),
         if (r.sportMsgs.isNotEmpty) Note(r.sportMsgs.first),
       ])),
-      if (r.ageIsDefault) Note('Edad no indicada: el cómputo por pulso, las zonas y el TRIMP usan ${VigorRepo.defaultAge} años por defecto. Indícala en Ajustes → Perfil.'),
+      if (r.ageIsDefault) Note('Indica tu edad en Ajustes → Perfil para ajustar las zonas de pulso.'),
       SectionHeader('Actividad de hoy', trailing: r.sessions.isEmpty ? null : TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SessionHistoryPage(r))), child: const Text('Historial'))),
       if (today.isEmpty) Panel(child: Padding(padding: const EdgeInsets.symmetric(vertical: Sp.x2), child: Text(r.sessions.isEmpty ? 'Aún no hay actividades. Sincroniza la pulsera para leerlas.' : 'Hoy aún no has hecho ninguna actividad. Las de otros días están en «Historial».', style: VT.body(c).copyWith(color: c.muted))))
       else for (final s in today) SessionTile(r, s),
-      const Note('Calorías, distancia y ritmo los calcula la pulsera (algoritmo del fabricante).'),
     ]);
   }
 }
@@ -182,13 +180,12 @@ class SessionPage extends StatelessWidget {
               if (!indoor && dv.speedKmh != null) ('Velocidad media (calculada)', '${dv.speedKmh!.toStringAsFixed(1)} km/h'),
             ]) Container(constraints: const BoxConstraints(minWidth: 140, minHeight: 48), padding: const EdgeInsets.all(Sp.x3), decoration: BoxDecoration(color: c.surfaceHi, borderRadius: BorderRadius.circular(16)), child: Stat(e.$1, e.$2)),
           ]),
-          if (!indoor && dv.speedKmh != null) const Note('Velocidad media calculada con la distancia y el tiempo de la pulsera.'),
-          if (!indoor && dv.paceDiffers) Note('Ritmo calculado distinto del de la pulsera: ${pace(dv.paceSecKm!)} frente a ${pace(s.paceSecKm)}. Se muestra el de la pulsera.'),
-          Note(indoor ? 'Modo de interior: sin GPS. Las calorías y el pulso los calcula la pulsera (algoritmo del fabricante); el número de series o repeticiones no está disponible en la SDK que usa Vigor (no verificado).' : 'Distancia, calorías y ritmo los calcula la pulsera; la distancia por GPS es solo una comprobación y puede acumular deriva en interiores.'),
+          if (!indoor && dv.paceDiffers) Note('Ritmo calculado: ${pace(dv.paceSecKm!)}; se muestra el de la pulsera.'),
+          Align(alignment: Alignment.centerRight, child: InfoButton('Sobre esta sesión', indoor ? 'Modo de interior: sin GPS. Las calorías y el pulso los calcula la pulsera; el número de series o repeticiones no está disponible (no verificado). La velocidad media se calcula con la distancia y el tiempo de la pulsera.' : 'Distancia, calorías y ritmo los calcula la pulsera; la distancia por GPS es solo una comprobación y puede acumular deriva en interiores. La velocidad media se calcula con la distancia y el tiempo de la pulsera.')),
         ])),
         if (!indoor) RoutePanel(repo, s),
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          MetricHeader(Icons.favorite, 'Pulso y zonas', c.heart), const SizedBox(height: Sp.x3),
+          MetricHeader(Icons.favorite, 'Pulso y zonas', c.heart, trailing: const InfoButton('Pulso y zonas', 'FCmáx = 208 − 0,7·edad (Tanaka 2001), con un margen de ± 10 bpm. El TRIMP es un índice relativo personal. Si no has indicado tu edad se usa un valor por defecto: ajústala en Ajustes → Perfil.')), const SizedBox(height: Sp.x3),
           if (s.hrPerMinute.length < 2) Text('Sin lecturas de pulso.', style: VT.body(c).copyWith(color: c.muted)) else ...[
             SizedBox(height: 110, child: CustomPaint(size: Size.infinite, painter: LinePainter([for (var i = 0; i < s.hrPerMinute.length; i++) i.toDouble()], s.hrPerMinute.map((e) => e.toDouble()).toList(), c.heart, c.surfaceAlt, c.muted))),
             const SizedBox(height: Sp.x3),
@@ -198,9 +195,7 @@ class SessionPage extends StatelessWidget {
               SizedBox(width: 56, child: Text('${zm[z]} min', textAlign: TextAlign.right, style: VT.caption(c))),
             ])),
             const SizedBox(height: Sp.x2),
-            Text('Carga (TRIMP de Edwards): $trimp · FCmáx estimada ${hrMaxTanaka(repo.age)} ± 10 bpm', style: VT.body(c)),
-            const Note('FCmáx = 208 − 0,7·edad (Tanaka 2001). El TRIMP es un índice relativo personal. Ver docs/ANALISIS.md.'),
-            if (repo.ageIsDefault) Note('Edad no indicada: se usan ${VigorRepo.defaultAge} años por defecto para la FCmáx y las zonas. Indícala en Dispositivo → Perfil.'),
+            Text('Carga (TRIMP): $trimp · FCmáx aprox. ${hrMaxTanaka(repo.age)} bpm', style: VT.body(c)),
           ],
         ])),
       ]),

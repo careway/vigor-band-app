@@ -93,10 +93,12 @@ class _SleepPageState extends State<SleepPage> {
       const SizedBox(height: Sp.x3),
       if (n == 0) Text('Sin datos de noche en estos ${per.days} días.', style: VT.body(c).copyWith(color: c.muted)) else WeekChart(per.slots, cur.date, (x) => setState(() => _sel = x.date), meanMin: per.meanMin),
       Wrap(spacing: Sp.x4, runSpacing: Sp.x1, children: [for (final s in [Stage.deep, Stage.light, Stage.rem]) Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 12, height: 12, color: stageColor(c, s)), const SizedBox(width: 4), Text(stageName(s), style: VT.caption(c))]), Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 12, height: 12, color: c.exp), const SizedBox(width: 4), Text('Sin fases', style: VT.caption(c))]), Text('--- media', style: VT.caption(c))]),
-      const Note('Barras = sueño por noche (el número bajo cada barra es el día del mes). Toca una barra para ver esa noche. Los días sin barra no tienen dato: no se rellenan.'),
+      const Note('Toca una barra para ver esa noche.'),
     ]));
   }
 }
+
+const _kSleepInfo = 'Las fases son estimaciones de una pulsera de consumo, no una polisomnografía: sobreestiman el sueño ligero (Chinoy 2021) y no sirven para diagnóstico. Sin rangos de referencia: no hay objetivos personales verificados. Implementado, no probado en hardware.';
 
 /// Detalle de una noche: hipnograma + FC en el mismo eje, fases, métricas y ayuda. Sin fases (`sleepLine`): solo totales.
 class NightCard extends StatelessWidget {
@@ -114,7 +116,7 @@ class NightCard extends StatelessWidget {
           if (n.down != null && n.up != null) Stat('Horario', '${hm(n.down!)} – ${hm(n.up!)}'),
           Stat('Profundo aprox.', dur(n.deep * 60)), Stat('Ligero aprox.', dur(n.light * 60)),
         ]),
-        const Note('Esta noche no trae el detalle por minutos de la pulsera, así que solo se muestran los totales. Las fases son aproximadas: los relojes de consumo sobreestiman el sueño ligero (Chinoy 2021).'),
+        const Note('Esta noche solo tiene totales; las fases son aproximadas.'),
       ])));
     }
     final m = sleepMetrics(st); final s0 = n.start;
@@ -142,7 +144,7 @@ class NightCard extends StatelessWidget {
           '«Hasta el primer sueño profundo» no es la latencia de sueño. Los despertares se cuentan del gráfico (tramos despiertos de 5 min o más entre sueño); la pulsera puede contar otros. '
           '${n.precise ? 'El REM solo existe en el modo de sueño preciso.' : 'Esta noche está en modo normal: la pulsera guarda fases cada 5 min y no distingue REM.'}', style: VT.body(c))),
       ]),
-      const Note('Las fases son estimaciones de una pulsera de consumo, no una polisomnografía: sobreestiman el sueño ligero (Chinoy 2021) y no sirven para diagnóstico. Sin rangos de referencia: no hay objetivos personales verificados. Implementado, no probado en hardware.'),
+      Row(children: [const Expanded(child: Note('Las fases son estimaciones, no un diagnóstico.')), InfoButton('Sobre las fases del sueño', _kSleepInfo)]),
     ])));
   }
 }

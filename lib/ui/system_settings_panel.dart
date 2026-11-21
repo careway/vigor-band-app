@@ -26,8 +26,8 @@ class _SystemSettingsPanelState extends State<SystemSettingsPanel> with WidgetsB
   Widget build(BuildContext context) {
     final c = VC.of(context); final s = st;
     return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Ajustes del sistema', style: VT.heading(c)),
-      const Note('Son ajustes de Android, no permisos con ventana de «permitir»: Vigor puede consultar si los tienes y llevarte a su pantalla, pero no puede activarlos por ti. Sin ellos, la sincronización con la app cerrada puede retrasarse o no ocurrir.'),
+      Row(children: [Expanded(child: Text('Ajustes del sistema', style: VT.heading(c))), const InfoButton('Ajustes del sistema', 'Son ajustes de Android, no permisos con ventana de «permitir»: Vigor puede consultar si los tienes y llevarte a su pantalla, pero no puede activarlos por ti. Sin ellos, la sincronización con la app cerrada puede retrasarse o no ocurrir.')]),
+      const Note('Sin estos ajustes, la sincronización con la app cerrada puede retrasarse.'),
       if (s == null) const Padding(padding: EdgeInsets.all(Sp.x3), child: Center(child: CircularProgressIndicator()))
       else ...[
         _Row(icon: Icons.battery_saver_outlined, title: 'Batería: ejecutar sin restricciones', ok: s.batteryUnrestricted,

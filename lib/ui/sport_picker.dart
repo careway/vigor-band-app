@@ -40,7 +40,7 @@ class _SportPickerState extends State<SportPicker> {
         SliverPadding(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x2), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Elige el modo deportivo', style: VT.title(c)),
           const SizedBox(height: Sp.x2),
-          Text('${sportModes.length} modos de la SDK. La SDK no indica cuáles admite tu pulsera: si no admite el elegido, no empezará.', style: VT.caption(c)),
+          Text('Si tu pulsera no admite el modo elegido, no empezará.', style: VT.caption(c)),
           const SizedBox(height: Sp.x3),
           TextField(
             decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar modo', filled: true, fillColor: c.surfaceHi, border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),

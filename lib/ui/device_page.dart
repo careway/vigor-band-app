@@ -75,7 +75,6 @@ class DevicePage extends StatelessWidget {
           Text('VIGOR · $_label', style: VT.heading(c)), const Spacer(),
           if (r.battery != null) Text('${r.battery}%${r.charging ? ' ⚡' : ''}', style: VT.heading(c)),
         ]),
-        if (r.savedMac != null) Note('Pulsera guardada: ${maskMac(r.savedMac)}'),
         if (r.syncing) ...[const SizedBox(height: Sp.x3), LinearProgressIndicator(value: r.progress > 0 && r.progress < 1 ? r.progress : null), const Note('Sincronizando…')]
         else if (r.lastSync != null) Note('${syncAgoText(r.lastSync, r.clock())} (${hm(r.lastSync!)})'),
         const SizedBox(height: Sp.x3),
@@ -86,7 +85,6 @@ class DevicePage extends StatelessWidget {
           if (ok) OutlinedButton(onPressed: r.disconnect, child: const Text('Desconectar')),
           OutlinedButton(onPressed: r.scan, child: Text(r.savedMac == null ? 'Buscar pulsera' : 'Buscar otra')),
         ]),
-        if (r.savedMac != null) const Note('Reconecta por la MAC guardada, sin escanear: no necesita la ubicación del móvil. La ubicación solo se pide para buscar una pulsera nueva (Android ≤ 11).'),
       ])),
       if (r.found.isNotEmpty) ...[
         const SectionHeader('Encontradas'),
@@ -105,8 +103,8 @@ class ProfilePage extends StatelessWidget {
     return SettingsScaffold('Perfil', [
       Panel(child: Column(children: [
         _stepper(context, 'Edad', '${r.age} años', () => r.setPref('age', (r.age - 1).clamp(10, 100)), () => r.setPref('age', (r.age + 1).clamp(10, 100))),
-        if (r.ageIsDefault) Align(alignment: Alignment.centerLeft, child: Note('Edad no indicada: se usa ${VigorRepo.defaultAge} años por defecto. Ajústala para que la FCmáx y las zonas sean más fieles.')),
-        Align(alignment: Alignment.centerLeft, child: Note('FCmáx estimada: ${hrMaxTanaka(r.age)} ± 10 bpm (Tanaka 2001)')),
+        if (r.ageIsDefault) Align(alignment: Alignment.centerLeft, child: Note('Edad no indicada: se usa un valor por defecto.')),
+        Row(children: [Expanded(child: Note('FCmáx estimada: ${hrMaxTanaka(r.age)} bpm')), const InfoButton('FCmáx estimada', 'FCmáx = 208 − 0,7·edad (Tanaka 2001), con un margen de ± 10 bpm. Se usa para las zonas de pulso y el TRIMP.')]),
         const Divider(),
         _stepper(context, 'Meta de pasos', '${r.stepGoal}', () => r.setPref('goal', (r.stepGoal - 500).clamp(1000, 40000)), () => r.setPref('goal', (r.stepGoal + 500).clamp(1000, 40000))),
       ])),
@@ -126,13 +124,11 @@ class SportSettingsPage extends StatelessWidget {
     final c = VC.of(context); final route = sportModes.where((m) => m.tracksRoute).length;
     return SettingsScaffold('Actividad y deportes', [
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${sportModes.length} modos de la SDK de Veepoo: $route de recorrido (ruta con GPS) y ${sportModes.length - route} de interior o sin GPS.', style: VT.body(c)),
-        const Note('La SDK no informa de qué modos admite tu pulsera; si no admite el elegido, no empezará. La clasificación recorrido/interior es de Vigor.'),
-        const Note('Los datos de series o repeticiones no los expone la SDK que usa Vigor (no verificado).'),
+        Row(children: [Expanded(child: Text('${sportModes.length} modos: $route de recorrido (con GPS) y ${sportModes.length - route} de interior.', style: VT.body(c))),
+          const InfoButton('Modos de actividad', 'La SDK no informa de qué modos admite tu pulsera; si no admite el elegido, no empezará. La clasificación recorrido/interior es de Vigor. Las series o repeticiones no están disponibles (no verificado).')]),
       ])),
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('FCmáx estimada: ${hrMaxTanaka(repo.age)} ± 10 bpm', style: VT.body(c)),
-        const Note('Se usa para las zonas de pulso y el TRIMP (Tanaka 2001). Cambia tu edad en Perfil.'),
+        Row(children: [Expanded(child: Text('FCmáx estimada: ${hrMaxTanaka(repo.age)} bpm', style: VT.body(c))), const InfoButton('FCmáx estimada', 'FCmáx = 208 − 0,7·edad (Tanaka 2001), con un margen de ± 10 bpm. Se usa para las zonas de pulso y el TRIMP. Cambia tu edad en Perfil.')]),
       ])),
     ]);
   }
@@ -155,11 +151,10 @@ class _MeasurementsPageState extends State<MeasurementsPage> {
     final c = VC.of(context); final ok = r.conn == 'connected'; final list = r.autoMeasures;
     return SettingsScaffold('Mediciones y cadencia', [
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Note('La pulsera mide sola en segundo plano. Aquí puedes activar o desactivar cada medición y, si la pulsera lo permite, cada cuántos minutos. Medir más a menudo da más lecturas pero gasta más batería (consumo exacto no medido).'),
-        const SizedBox(height: Sp.x2),
-        FilledButton.icon(onPressed: ok ? r.readAutoMeasure : null, icon: const Icon(Icons.refresh), label: const Text('Leer de la pulsera')),
+        Row(children: [FilledButton.icon(onPressed: ok ? r.readAutoMeasure : null, icon: const Icon(Icons.refresh), label: const Text('Leer de la pulsera')), const Spacer(),
+          const InfoButton('Mediciones automáticas', 'La pulsera mide sola en segundo plano. Puedes activar cada medición y, si la pulsera lo permite, elegir cada cuántos minutos. Medir más a menudo da más lecturas pero gasta más batería (consumo exacto no medido). No verificado con la pulsera: la SDK documenta estas funciones, pero esta pulsera puede rechazar valores.')]),
         if (!ok) const Note('Conecta la pulsera para leer o cambiar la cadencia.'),
-        if (r.autoUnsupported) const Note('Esta pulsera no admite ajustar la medición automática (según la SDK).'),
+        if (r.autoUnsupported) const Note('Esta pulsera no admite ajustar la medición automática.'),
         if (r.autoMsg != null) Semantics(liveRegion: true, child: Note(r.autoMsg!)),
       ])),
       if (list != null && list.isEmpty && !r.autoUnsupported) const Note('La pulsera no devolvió ninguna medición ajustable.'),
@@ -171,10 +166,9 @@ class _MeasurementsPageState extends State<MeasurementsPage> {
           Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
             for (final v in m.choices.where((v) => v <= 60 || v % 60 == 0)) ChoiceChip(label: Text('$v min'), selected: v == m.interval, onSelected: ok ? (_) => r.setAutoMeasure(m.type, true, interval: v) : null),
           ]),
-          if (autoBatteryWarning(m.interval) != null) Note(autoBatteryWarning(m.interval)!),
+          if (autoBatteryWarning(m.interval) != null) Note('Menos de 10 min gasta más batería.'),
         ] else if (m.on) const Note('Esta pulsera no permite cambiar el intervalo de esta medición.'),
       ])),
-      const Note('No verificado con la pulsera: la SDK documenta estas funciones, pero esta pulsera puede rechazar valores. No existe en la SDK un ajuste del muestreo durante el deporte.'),
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Pulso en vivo con la app abierta', style: VT.heading(c)),
           subtitle: Text(r.liveOn ? 'Mide el pulso cada ${r.liveSec} s mientras ves Hoy' : 'Desactivado: solo mide al tocar el corazón', style: VT.caption(c)),
@@ -183,11 +177,11 @@ class _MeasurementsPageState extends State<MeasurementsPage> {
           Text('Intervalo', style: VT.caption(c)), const SizedBox(height: Sp.x1),
           Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [for (final v in LiveHeart.allowedIntervals) ChoiceChip(label: Text('$v s'), selected: v == r.liveSec, onSelected: (_) => r.setLiveSec(v))]),
         ],
-        const Note('Cada medición enciende el sensor óptico unos segundos: medir a menudo gasta batería de la pulsera (más cuanto más corto el intervalo). Solo funciona con la app abierta en Hoy y la pulsera conectada; se detiene al sincronizar, durante un deporte y con la batería de la pulsera por debajo del 20 %. Función implementada pero no probada con la pulsera.'),
+        const Align(alignment: Alignment.centerRight, child: InfoButton('Pulso en vivo', 'Cada medición enciende el sensor óptico unos segundos: medir a menudo gasta batería de la pulsera. Solo funciona con la app abierta en Hoy y la pulsera conectada; se detiene al sincronizar, durante un deporte y con la batería de la pulsera por debajo del 20 %. Función implementada pero no probada con la pulsera.')),
       ])),
       const SectionHeader('Experimentales'),
       Panel(child: SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Mostrar métricas experimentales', style: VT.body(c)),
-        subtitle: Text('Glucosa y componentes sanguíneos estimados por el fabricante. Apagado de serie.', style: VT.caption(c)),
+        subtitle: Text('Glucosa y análisis de sangre estimados.', style: VT.caption(c)),
         value: r.showExperimental, onChanged: (v) => _toggleExp(context, v))),
     ]);
   }
@@ -213,7 +207,7 @@ class AgpsPage extends StatelessWidget {
   Widget build(BuildContext context) => SettingsScaffold('Efemérides GPS', [
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_agps(repo.agps), style: VT.body(VC.of(context))),
-          const Note('Se descargan una vez al día y se envían a la pulsera cuando está a mano. Todo en segundo plano, sin avisos. Solo afectan a los modos de recorrido.'),
+          const Note('Se actualizan solas en segundo plano.'),
         ])),
       ]);
 }
@@ -235,7 +229,6 @@ class AppearancePage extends StatelessWidget {
         SegmentedButton<int>(showSelectedIcon: false, style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(48, 48))),
           segments: const [ButtonSegment(value: 0, label: Text('Oscuro')), ButtonSegment(value: 1, label: Text('Claro')), ButtonSegment(value: 2, label: Text('Sistema'))],
           selected: {repo.themeMode}, onSelectionChanged: (v) => repo.setThemeMode(v.first)),
-        const Note('Oscuro es el tema principal. El tema claro está pendiente de revisión visual en el móvil.'),
       ])),
     ]);
   }
@@ -248,7 +241,7 @@ class AdvancedPage extends StatelessWidget {
     final c = VC.of(context);
     return SettingsScaffold('Avanzado y depuración', [
       if (kDebugMode) Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Note('Herramientas de laboratorio (solo compilaciones de depuración). El resultado va al registro técnico; el volcado de sueño queda en el directorio privado de la app (files/debug), sin MAC. Con la pulsera conectada y sin sincronizar.'),
+        const Note('Herramientas de depuración. El resultado va al registro técnico.'),
         const SizedBox(height: Sp.x2),
         Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
           OutlinedButton(onPressed: repo.conn == 'connected' ? repo.debugSleepDump : null, child: const Text('Volcado de sueño')),
@@ -267,6 +260,8 @@ class AdvancedPage extends StatelessWidget {
 }
 
 /// Privacidad y datos: exportar y borrar. Todo local; no se envía nada a internet.
+const _kPrivacyInfo = 'Tus datos se guardan solo en este móvil. Al exportar, Vigor prepara una copia temporal privada y abre el selector de compartir de Android: tú eliges dónde guardarla o a qué app enviarla. Lo que elijas queda fuera del control de Vigor (otra app o carpeta puede conservarlo o leerlo). La copia temporal se borra al volver a abrir esta pantalla y con «Borrar todos». Vigor no envía nada a internet por su cuenta. Solo si activas «Salud y compartir», Vigor escribe en Health Connect / Apple Salud (en tu móvil, sin leer nada de allí): lo que ya enviaste se borra desde esa pantalla, no con «Borrar todos».';
+
 class PrivacyPanel extends StatefulWidget {
   final VigorRepo repo; const PrivacyPanel(this.repo, {super.key});
   @override
@@ -291,7 +286,7 @@ class _PrivacyPanelState extends State<PrivacyPanel> {
   Widget build(BuildContext context) => ListenableBuilder(listenable: repo, builder: (context, _) {
     final c = VC.of(context); final busy = repo.privacyBusy;
     return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Note('Tus datos se guardan solo en este móvil. Al exportar, Vigor prepara una copia temporal privada y abre el selector de compartir de Android: tú eliges dónde guardarla o a qué app enviarla. Lo que elijas queda fuera del control de Vigor (otra app o carpeta puede conservarlo o leerlo). La copia temporal se borra al volver a abrir esta pantalla y con «Borrar todos». Vigor no envía nada a internet por su cuenta. Solo si activas «Salud y compartir», Vigor escribe en Health Connect / Apple Salud (en tu móvil, sin leer nada de allí): lo que ya enviaste se borra desde esa pantalla, no con «Borrar todos».'),
+      Row(children: [const Expanded(child: Note('Tus datos se guardan solo en este móvil. Vigor no envía nada a internet por su cuenta.')), InfoButton('Privacidad', _kPrivacyInfo)]),
       const SizedBox(height: Sp.x3),
       Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
         OutlinedButton.icon(onPressed: busy ? null : repo.exportData, icon: const Icon(Icons.upload_file_outlined, size: 18), label: const Text('Exportar mis datos')),
@@ -314,16 +309,16 @@ class SyncSettingsPage extends StatelessWidget {
     return SettingsScaffold('Sincronización', [
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Sincronización automática', style: VT.heading(c)),
-          subtitle: Text(r.autoOn ? 'La pulsera se lee sola y los datos llegan a Health Connect (si lo activaste), con la app abierta o cerrada' : 'Desactivada: solo sincronizas tú. Apaga el temporizador, la reconexión y el trabajo en segundo plano', style: VT.caption(c)),
+          subtitle: Text(r.autoOn ? 'La pulsera se lee sola, con la app abierta o cerrada' : 'Desactivada: solo sincronizas tú', style: VT.caption(c)),
           value: r.autoOn, onChanged: (v) => r.setAutoSync(enabled: v)),
         if (r.autoOn) ...[
           Text('Intervalo', style: VT.caption(c)), const SizedBox(height: Sp.x1),
           Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [for (final v in kAutoSyncIntervals) ChoiceChip(label: Text('$v min'), selected: v == r.autoMin, onSelected: (_) => r.setAutoSync(minutes: v))]),
           SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Solo con la pantalla encendida', style: VT.body(c)),
-            subtitle: Text('Con la pantalla apagada no se conecta por Bluetooth ni se envía nada: ahorra batería. Se pone al día poco después de encenderla.', style: VT.caption(c)),
+            subtitle: Text('Con la pantalla apagada no se sincroniza: ahorra batería.', style: VT.caption(c)),
             value: r.screenOnly, onChanged: (v) => r.setAutoSync(screenOnlyOnly: v)),
           SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Enviar a Health Connect sin abrir la app', style: VT.body(c)),
-            subtitle: Text(r.health.master ? 'Tras una sincronización en segundo plano, con la app cerrada. Si lo apagas, se envía al abrir Vigor.' : 'Health Connect está desactivado en «Salud y compartir»: no se envía nada.', style: VT.caption(c)),
+            subtitle: Text(r.health.master ? 'Con la app cerrada; si no, al abrir Vigor.' : 'Activa «Salud y compartir» para usarlo.', style: VT.caption(c)),
             value: r.bgExport, onChanged: (v) => r.setAutoSync(bgExportOn: v)),
         ],
       ])),
@@ -335,7 +330,7 @@ class SyncSettingsPage extends StatelessWidget {
         if (!ok) const Note('Conecta la pulsera para sincronizar a mano.'),
       ])),
       SystemSettingsPanel(r),
-      const Note('La sincronización en segundo plano se ha comprobado con la pulsera real en un solo móvil (Xiaomi, Android 10) y una sola vez. El sistema decide cuándo ejecutarla: el intervalo mínimo de Android es de 15 min y puede retrasarse.'),
+      const Row(children: [Expanded(child: Note('En segundo plano, Android decide cuándo se ejecuta.')), InfoButton('Sincronización en segundo plano', 'La sincronización en segundo plano se ha comprobado con la pulsera real en un solo móvil (Xiaomi, Android 10) y una sola vez. El sistema decide cuándo ejecutarla: el intervalo mínimo de Android es de 15 min y puede retrasarse.')]),
     ]);
   }
 }

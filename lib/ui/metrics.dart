@@ -19,7 +19,7 @@ class MetricSpec {
 }
 
 const kHr = MetricSpec('hr', 'Pulso', 'bpm', Icons.favorite, _cHr, _hr, 'Lecturas del sensor óptico de la pulsera (se supone una por minuto; no verificado). El pulso en reposo es una estimación propia («aprox.», sin validar): de noche, la mediana de las 30 lecturas más bajas de 00:00 a 06:00; de respaldo, la media del 10 % más bajo del día.', q: 'hr');
-const kSpo2 = MetricSpec('spo2', 'Oxígeno en sangre (SpO₂)', '%', Icons.air, _cSpo2, _spo2, 'Tendencia orientativa de una pulsera de muñeca (menor perfusión y más ruido que en el dedo). No sustituye a un oxímetro médico ni emite alertas. Las lecturas por debajo de 70 % se descartan (filtro propio). Ver docs/ANALISIS.md §6.', minY: 85, maxY: 100, q: 'spo2');
+const kSpo2 = MetricSpec('spo2', 'Oxígeno en sangre (SpO₂)', '%', Icons.air, _cSpo2, _spo2, 'Tendencia orientativa de una pulsera de muñeca (menor perfusión y más ruido que en el dedo). No sustituye a un oxímetro médico ni emite alertas. Las lecturas por debajo de 70 % se descartan (filtro propio). ', minY: 85, maxY: 100, q: 'spo2');
 const kHrv = MetricSpec('hrv', 'Variabilidad del pulso', 'ms', Icons.monitor_heart_outlined, _cHrv, _hrv, 'Variabilidad del pulso (PPG, aprox.): RMSSD que calcula la app con los intervalos RR de la pulsera; con luz en la muñeca tiende a dar valores más bajos que el ECG (un estudio de otro dispositivo). Los valores de distinta duración no son intercambiables (Shaffer & Ginsberg 2017) y no se compara con tablas poblacionales: solo contigo mismo.', q: 'hrv');
 const kStress = MetricSpec('stress', 'Estrés (índice)', '', Icons.bolt, _cStress, _stress, 'Índice 0–100 del fabricante; el SDK no documenta su algoritmo. Las revisiones indican que el estrés por HRV en relojes de consumo tiene precisión pobre (Hickey 2021): úsalo solo como tendencia relativa, sin categorías.', minY: 0, maxY: 100, q: 'stress');
 const kMet = MetricSpec('met', 'Energía (MET)', 'MET', Icons.local_fire_department, _cMet, _met, 'MET del fabricante (algoritmo no documentado ni validado). 1 MET ≈ reposo sentado (≈ 3,5 mL O₂/kg/min; definición de fuente secundaria). Aquí no se clasifica por intensidad; solo el cómputo semanal de Actividad usa el corte de la OMS (≥ 3 MET), con rótulo «aprox.».', decimals: 1, minY: 0, q: 'met');
@@ -56,7 +56,8 @@ class ExperimentalBanner extends StatelessWidget {
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), color: c.exp.withValues(alpha: .14), border: Border.all(color: c.exp.withValues(alpha: .4))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(Icons.science_outlined, color: c.exp, size: 20), const SizedBox(width: Sp.x3),
-        Expanded(child: Text('Estimaciones experimentales del fabricante. La FDA (2024) no ha autorizado ningún reloj o anillo para medir glucosa sin pinchar la piel y recomienda no usarlos; para los componentes sanguíneos no hay validación en muñeca. No las uses para decidir medicación ni tratamientos.', style: VT.caption(c).copyWith(color: c.text))),
+        Expanded(child: Text('Estimación experimental: no la uses para decisiones médicas.', style: VT.caption(c).copyWith(color: c.text))),
+        const InfoButton('Valores experimentales', 'Estimaciones experimentales del fabricante. La FDA (2024) no ha autorizado ningún reloj o anillo para medir glucosa sin pinchar la piel y recomienda no usarlos; para los componentes sanguíneos no hay validación en muñeca. No las uses para decidir medicación ni tratamientos.'),
       ]),
     );
   }
@@ -106,7 +107,6 @@ class _MetricDetailState extends State<MetricDetailPage> {
         if (first.id == 'hr' && !first.experimental) RestingNightCard(r, key),
         if (first.id == 'hrv') HrvNightCard(r, key),
         for (var n = 0; n < widget.specs.length; n++) _section(context, c, r, widget.specs[n], n == 0),
-        Note('Fuentes y límites: docs/ANALISIS.md'),
       ]))),
     );
   }
@@ -115,7 +115,7 @@ class _MetricDetailState extends State<MetricDetailPage> {
     final day = r.days[key]; final data = day == null ? <Sample>[] : s.series(day); final col = s.color(c);
     final st = statsOf(data); final base = baselineOf(r, s, key);
     final body = Glass(glow: col, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Icon(s.icon, size: 18, color: col), const SizedBox(width: Sp.x2), Expanded(child: Text(s.id == 'hrv' ? '${s.label} · todo el día (aprox.)' : s.label, style: VT.heading(c)))]),
+      Row(children: [Icon(s.icon, size: 18, color: col), const SizedBox(width: Sp.x2), Expanded(child: Text(s.id == 'hrv' ? '${s.label} · todo el día (aprox.)' : s.label, style: VT.heading(c))), InfoButton(s.label, s.note)]),
       const SizedBox(height: Sp.x3),
       if (st != null && !s.bars) Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
         CountUp(st.avg, (v) => fmtNum(v, s.decimals), VT.display(c).copyWith(color: s.experimental ? c.text : c.text)), const SizedBox(width: Sp.x2),
@@ -129,7 +129,6 @@ class _MetricDetailState extends State<MetricDetailPage> {
       ])],
       if (st != null && base != null && !s.experimental) Note('Tu media habitual (hasta 14 días): ${fmtNum(base, s.decimals)} ${s.unit} · hoy ${st.avg >= base ? '+' : ''}${fmtNum(st.avg - base, s.decimals)}'),
       if (s.q != null && day != null && !s.experimental) CoverageCaption(day.qOf(s.q!), spo2: s.id == 'spo2'),
-      Note(s.note),
     ]));
     return Padding(padding: const EdgeInsets.only(bottom: Sp.x3), child: hero ? Hero(tag: 'tile-${s.id}', child: Material(type: MaterialType.transparency, child: body)) : body);
   }

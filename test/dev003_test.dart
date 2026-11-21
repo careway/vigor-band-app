@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vigor_app/ui/widgets.dart';
 import 'package:vigor_app/data/analysis.dart';
 import 'package:vigor_app/data/repo.dart';
 import 'package:vigor_app/theme/tokens.dart';
@@ -213,7 +214,7 @@ void main() {
     });
     testWidgets('tarjeta HRV: texto de ventana ultracorta (10 latidos) visible', (t) async {
       final r = await load({}, now: DateTime(2026, 3, 9)); await pump(t, ListView(children: [HrvNightCard(r, '2026-03-05')]));
-      expect(find.textContaining('10 latidos'), findsOneWidget); expect(hrvSampleText, contains('2550'));
+      await t.tap(find.byType(InfoButton)); await t.pumpAndSettle(); expect(find.textContaining('10 latidos'), findsOneWidget); expect(hrvSampleText, contains('2550'));
     });
   });
 

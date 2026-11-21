@@ -23,8 +23,7 @@ class HealthPage extends StatelessWidget {
         SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Compartir con $p', style: VT.heading(c)),
           subtitle: Text(h.master ? 'Activado: Vigor escribe en $p tras cada sincronización de la pulsera.' : 'Desactivado: no se envía nada. Es opcional.', style: VT.caption(c)),
           value: h.master, onChanged: h.running ? null : (v) => h.setMaster(v)),
-        Note(kHealthPolicy.replaceAll('{P}', p)),
-        if (g.isIos) const Note('iPhone / Apple Salud: implementado pero NO compilado ni probado (no había Mac). Puede fallar.'),
+        Row(children: [const Expanded(child: Note('Solo se escribe lo que mide la pulsera; nada se envía a servidores.')), InfoButton('Privacidad y permisos', '${kHealthPolicy.replaceAll('{P}', p)}${g.isIos ? ' iPhone / Apple Salud: implementado pero NO compilado ni probado (no había Mac). Puede fallar.' : ''}')]),
       ])),
       if (h.master) ...[
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -37,13 +36,12 @@ class HealthPage extends StatelessWidget {
             if (!g.isIos) OutlinedButton(onPressed: g.openSettings, style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)), child: const Text('Abrir ajustes de Health Connect')),
             if (h.avail == HealthAvail.notInstalled || h.avail == HealthAvail.updateRequired) OutlinedButton(onPressed: g.installProvider, style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)), child: const Text('Instalar Health Connect')),
           ]),
-          if (g.isIos) const Note('Para revisar o retirar permisos: app Salud > Compartir > Apps > Vigor.'),
         ])),
         const SectionHeader('Qué se comparte'),
         for (final cat in HealthCat.values) _CatTile(h: h, cat: cat),
         const SectionHeader('Dejar de compartir'),
         Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Note('«Dejar de compartir» desactiva todo y detiene los envíos. No revoca los permisos del sistema ni borra lo ya enviado: para eso, usa $p (en Android: Ajustes de Health Connect > Permisos de apps > Vigor y Datos y acceso) o el borrado de abajo.'),
+          Row(children: [const Expanded(child: Note('Detiene los envíos; no borra lo ya enviado.')), InfoButton('Dejar de compartir', '«Dejar de compartir» desactiva todo y detiene los envíos. No revoca los permisos del sistema ni borra lo ya enviado: para eso, usa $p (en Android: Ajustes de Health Connect > Permisos de apps > Vigor y Datos y acceso; en iPhone: app Salud > Compartir > Apps > Vigor) o el borrado de abajo.')]),
           const SizedBox(height: Sp.x2),
           Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
             OutlinedButton(onPressed: () => h.stopSharing(), style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)), child: const Text('Dejar de compartir')),

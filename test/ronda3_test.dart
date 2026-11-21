@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vigor_app/ui/widgets.dart';
 import 'package:vigor_app/data/analysis.dart';
 import 'package:vigor_app/data/repo.dart';
 import 'package:vigor_app/theme/tokens.dart';
@@ -171,6 +172,8 @@ void main() {
       final repo = await load({'origin5': recs}, now: now);
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.dark), home: Scaffold(body: SingleChildScrollView(child: WeeklyActivityCard(repo)))));
       expect(find.text('Actividad de la semana (aprox.)'), findsOneWidget);
+      expect(find.textContaining('150–300 min semanales'), findsNothing);
+      await t.tap(find.byType(InfoButton)); await t.pumpAndSettle();
       expect(find.textContaining('150–300 min semanales'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp(r'^Actividad de la semana \(aprox\.\): 240 min de 150')), findsOneWidget);
       h.dispose();

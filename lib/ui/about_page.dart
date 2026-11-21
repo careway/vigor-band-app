@@ -3,6 +3,7 @@ import '../data/repo.dart';
 import '../data/updater.dart';
 import '../theme/tokens.dart';
 import 'device_page.dart';
+import 'limits_page.dart';
 import 'widgets.dart';
 
 String _when(DateTime? t) => t == null ? 'nunca' : '${t.day}/${t.month}/${t.year} ${hm(t)}';
@@ -26,6 +27,10 @@ class UpdateBanner extends StatelessWidget {
         ])));
       });
 }
+
+const _kUpdateInfo = 'La descarga solo se acepta por https desde github.com. La instalación siempre la confirma el instalador de Android; Vigor no instala nada por su cuenta y borra el archivo descargado después.\n\n'
+    'Las versiones de prueba van firmadas con la clave de depuración: solo se pueden instalar encima de una instalación firmada con la misma clave; si no, Android la rechaza y habría que desinstalar antes (se pierden los datos locales; exporta antes en Privacidad y datos).\n\n'
+    'Mientras el repositorio sea privado la comprobación no puede funcionar: la comprobación automática no avisa de nada y la manual te lo explica y ofrece la descarga a mano.';
 
 /// Versión instalada, última comprobación y actualización manual.
 class AboutPage extends StatelessWidget {
@@ -60,9 +65,12 @@ class AboutPage extends StatelessWidget {
               if (u.state == UpdateState.downloading) SizedBox(height: 48, child: OutlinedButton(onPressed: u.cancelDownload, child: const Text('Cancelar'))),
             ]),
           ])),
-          const Note('La descarga solo se acepta por https desde github.com. La instalación siempre la confirma el instalador de Android; Vigor no instala nada por su cuenta y borra el archivo descargado después.'),
-          const Note('Las versiones de prueba van firmadas con la clave de depuración: solo se pueden instalar encima de una instalación firmada con la misma clave; si no, Android la rechaza y habría que desinstalar antes (se pierden los datos locales; exporta antes en Privacidad y datos).'),
-          const Note('Mientras el repositorio sea privado la comprobación no puede funcionar: la comprobación automática no avisa de nada y la manual te lo explica y ofrece la descarga a mano.'),
+          Panel(padding: EdgeInsets.zero, child: Column(children: [
+            ListTile(minVerticalPadding: 12, leading: const Icon(Icons.calculate_outlined), title: const Text('Cómo se calcula y límites'), subtitle: const Text('Estimaciones, fuentes y avisos'), trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LimitsPage()))),
+            ListTile(minVerticalPadding: 12, leading: const Icon(Icons.shield_outlined), title: const Text('Sobre las actualizaciones'), subtitle: const Text('Descarga e instalación'), trailing: const Icon(Icons.chevron_right),
+              onTap: () => showInfoSheet(context, 'Sobre las actualizaciones', _kUpdateInfo)),
+          ])),
         ]);
       });
 }

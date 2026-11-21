@@ -88,7 +88,7 @@ class WorkoutPage extends StatelessWidget {
 
   Future<void> _finish(BuildContext context, VigorRepo r) async {
     final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: const Text('¿Terminar la actividad?'),
-        content: Text(r.conn == 'connected' ? 'Se envía la orden de parar a la pulsera.' : 'La pulsera no está conectada: solo se quita de esta pantalla; sigue grabando hasta que la pares tú.'),
+        content: Text(r.conn == 'connected' ? 'Se envía la orden de parar a la pulsera.' : 'La pulsera no está conectada: solo se quita de esta pantalla. Al reconectar, pulsa Terminar para pararla.'),
         actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Seguir')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Terminar'))]));
     if (ok == true) { if (r.conn == 'connected') { await r.stopSport(); } else { r.workout.end(); } if (context.mounted) Navigator.of(context).pop(); }
   }

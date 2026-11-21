@@ -56,15 +56,13 @@ class RestingNightCard extends StatelessWidget {
     final main = n.state == NightState.data ? 'Pulso en reposo (noche, aprox.): ${n.value!.round()} lpm' : null;
     final prog = repo.nightInProgress(dayKey) && n.state != NightState.none;
     return Padding(padding: const EdgeInsets.only(bottom: Sp.x3), child: Glass(glow: c.heart, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      MetricHeader(Icons.bedtime_outlined, 'Pulso en reposo nocturno (aprox.)', c.heart), const SizedBox(height: Sp.x3),
+      MetricHeader(Icons.bedtime_outlined, 'Pulso en reposo nocturno (aprox.)', c.heart, trailing: const InfoButton('Pulso en reposo nocturno', 'Noche = 00:00–06:00 (aprox.). Estimado con las lecturas más bajas de ese tramo. Sirve para ver tu tendencia, no es una puntuación de recuperación ni un dato médico.')), const SizedBox(height: Sp.x3),
       if (main == null) _stateText(context, n) else Semantics(container: true, label: '$main. $trend${prog ? '. $nightInProgressText' : ''}', child: ExcludeSemantics(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         BigValue(n.value!.round().toString(), 'lpm', size: 36), const SizedBox(height: Sp.x1), Text('Pulso en reposo (noche, aprox.)', style: VT.caption(c)),
         const SizedBox(height: Sp.x2), Text(trend!, style: VT.body(c)),
         if (prog) Padding(padding: const EdgeInsets.only(top: Sp.x1), child: Text(nightInProgressText, style: VT.caption(c))),
       ]))),
       if (n.state == NightState.data) _NightTrend(repo.nightHistory(dayKey, repo.nightHr), c.heart, 'lpm', 'Pulso en reposo nocturno'),
-      const Note('Noche = 00:00–06:00 (aprox.)'),
-      const Note('Estimado con las lecturas más bajas de 00:00 a 06:00. Sirve para ver tu tendencia, no es una puntuación de recuperación ni un dato médico.'),
     ])));
   }
 }
@@ -91,7 +89,7 @@ class HrvNightCard extends StatelessWidget {
     final main = n.state == NightState.data ? 'Variabilidad nocturna (aprox.): ${n.value!.round()} ms' : null;
     final prog = repo.nightInProgress(dayKey) && n.state != NightState.none;
     return Padding(padding: const EdgeInsets.only(bottom: Sp.x3), child: Glass(glow: c.hrv, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      MetricHeader(Icons.monitor_heart_outlined, 'Variabilidad nocturna (PPG, aprox.)', c.hrv), const SizedBox(height: Sp.x3),
+      MetricHeader(Icons.monitor_heart_outlined, 'Variabilidad nocturna (PPG, aprox.)', c.hrv, trailing: const InfoButton('Variabilidad nocturna', 'Noche = 00:00–06:00 (aprox.). $hrvLimitText $hrvSampleText')), const SizedBox(height: Sp.x3),
       if (main == null) _stateText(context, n) else Semantics(container: true, label: '$main. $cmp${n.lowQuality ? '. $hrvLowQualityText' : ''}${prog ? '. $nightInProgressText' : ''}', child: ExcludeSemantics(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         BigValue(n.value!.round().toString(), 'ms', size: 36), const SizedBox(height: Sp.x1), Text('Variabilidad nocturna (aprox.)', style: VT.caption(c)),
         const SizedBox(height: Sp.x2), Text(cmp!, style: VT.body(c)),
@@ -101,9 +99,6 @@ class HrvNightCard extends StatelessWidget {
       if (n.state == NightState.data && st.mean != null) Padding(padding: const EdgeInsets.only(top: Sp.x2), child: Text(
         'Media de ${week.length} noches: ${st.mean!.round()} ms${st.cv == null ? '' : ' · variación (CV) ${st.cv!.round()} %'}', style: VT.caption(c))),
       if (n.state == NightState.data) _NightTrend(repo.nightHistory(dayKey, repo.nightHrv), c.hrv, 'ms', 'Variabilidad nocturna'),
-      const Note('Noche = 00:00–06:00 (aprox.)'),
-      const Note(hrvLimitText),
-      const Note(hrvSampleText),
     ])));
   }
 }
@@ -115,11 +110,11 @@ class WeeklyActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = VC.of(context); final w = repo.weekMvpa();
     final noData = w.daysElapsed == 0 || w.missingDays >= w.daysElapsed && w.byMet == 0;
-    final byHrTxt = 'Por pulso: ${w.byHr} min (aprox., umbral propio: ${(kMvpaHrFraction * 100).round()} % de FCmáx${repo.ageIsDefault ? ', con ${VigorRepo.defaultAge} años por defecto' : ''})';
+    final byHrTxt = 'Por pulso: ${w.byHr} min (aprox.)';
     final miss = w.missingDays > 0 ? 'Faltan datos en ${w.missingDays} ${w.missingDays == 1 ? 'día' : 'días'}' : null;
     final label = noData ? 'Actividad de la semana (aprox.): sin datos suficientes' : 'Actividad de la semana (aprox.): ${w.byMet} min de 150. $byHrTxt.${miss == null ? '' : ' $miss.'}';
     return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      MetricHeader(Icons.local_fire_department, 'Actividad de la semana (aprox.)', c.met), const SizedBox(height: Sp.x3),
+      MetricHeader(Icons.local_fire_department, 'Actividad de la semana (aprox.)', c.met, trailing: const InfoButton('Actividad de la semana', 'Estimación con tu pulsera. La guía de la OMS 2020 recomienda 150–300 min semanales de actividad moderada (o 75–150 vigorosa) y se basa en cuestionarios y acelerómetros, no en esta pulsera. El esfuerzo moderado se estima con el MET del fabricante (≥ 3) y puede fallar. No es un diagnóstico.')), const SizedBox(height: Sp.x3),
       Semantics(container: true, label: label, child: ExcludeSemantics(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (noData) Text('Sin datos suficientes esta semana.', style: VT.body(c).copyWith(color: c.muted)) else ...[
           Row(crossAxisAlignment: CrossAxisAlignment.end, children: [Text('${w.byMet}', style: VT.display(c).copyWith(fontSize: 36)), const SizedBox(width: Sp.x2), Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('min de 150', style: VT.body(c)))]),
@@ -130,7 +125,6 @@ class WeeklyActivityCard extends StatelessWidget {
         ],
         if (miss != null) Padding(padding: const EdgeInsets.only(top: Sp.x2), child: Text(miss, style: VT.caption(c))),
       ]))),
-      const Note('Estimación con tu pulsera. La guía de la OMS 2020 recomienda 150–300 min semanales de actividad moderada (o 75–150 vigorosa) y se basa en cuestionarios y acelerómetros, no en esta pulsera. El esfuerzo moderado se estima con el MET del fabricante (≥ 3) y puede fallar. No es un diagnóstico.'),
     ]));
   }
 }
