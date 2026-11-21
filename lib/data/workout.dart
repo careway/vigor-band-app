@@ -20,10 +20,10 @@ List<WorkoutField> workoutFields(SportMode? m) {
   ];
 }
 
-// Unidades SUPUESTAS del informe en vivo de la pulsera (el SDK no las documenta y no se han podido comprobar con la pulsera):
-// duración en segundos, distancia en metros, ritmo en segundos por km, velocidad en km/h, calorías en kcal. Si al probar con la pulsera no
-// cuadran, se corrigen aquí (y solo aquí).
-const double kLiveDistanceToMeters = 1, kLiveCaloriesToKcal = 1;
+// Unidades del informe en vivo de la pulsera, según la documentación china del SDK («设置运动控制», SportControlDataInfo): duración en segundos,
+// distancia en metros, pulso en lpm, ritmo en segundos por km, calorías en CALORÍAS (no kcal: se dividen entre 1000) y velocidad en METROS POR HORA
+// (se divide entre 1000 para km/h). Documentadas, pero sin comprobar todavía con la pulsera; si no cuadran, se corrigen aquí.
+const double kLiveDistanceToMeters = 1, kLiveCaloriesToKcal = 0.001, kLiveSpeedToKmh = 0.001;
 
 double? _num(Object? v) { if (v is num) return v.isFinite ? v.toDouble() : null; if (v is String) return double.tryParse(v); return null; }
 
@@ -42,8 +42,8 @@ class WorkoutReport {
       durationSec: dur != null && dur >= 0 && dur < 86400 * 2 ? dur.round() : null,
       distanceM: dist != null && dist >= 0 && dist < 1e7 ? dist * kLiveDistanceToMeters : null,
       paceSecKm: pace != null && pace >= 60 && pace <= 3600 ? pace : null,
-      speedKmh: sp != null && sp >= 0 && sp < 120 ? sp : null,
-      kcal: kc != null && kc >= 0 && kc < 20000 ? kc * kLiveCaloriesToKcal : null,
+      speedKmh: sp != null && sp >= 0 && sp * kLiveSpeedToKmh < 120 ? sp * kLiveSpeedToKmh : null,
+      kcal: kc != null && kc >= 0 && kc * kLiveCaloriesToKcal < 20000 ? kc * kLiveCaloriesToKcal : null,
       runState: '${d['runState'] ?? ''}');
   }
 }

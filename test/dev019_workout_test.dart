@@ -8,8 +8,8 @@ import 'package:vigor_app/theme/tokens.dart';
 import 'package:vigor_app/ui/workout_ui.dart';
 
 const _mc = MethodChannel('vigor/methods');
-// Informes sintéticos con la forma del SDK (nombres de los campos de SportControlDataInfo); las unidades son las supuestas.
-Map<String, Object?> _rep({Object? hr = 140, Object? dist = 1200, Object? pace = 330, Object? dur = 600, String run = 'RUNNING', Object? type = 1, Object? gps = 2, Object? kcal = 80, Object? speed = 11.5}) =>
+// Informes sintéticos con la forma del SDK (SportControlDataInfo) y sus unidades documentadas: calorías en calorías y velocidad en m/h.
+Map<String, Object?> _rep({Object? hr = 140, Object? dist = 1200, Object? pace = 330, Object? dur = 600, String run = 'RUNNING', Object? type = 1, Object? gps = 2, Object? kcal = 80000, Object? speed = 11500}) =>
     {'heartRate': hr, 'distance': dist, 'pace': pace, 'sportDuration': dur, 'runState': run, 'sportType': type, 'gpsSignal': gps, 'calories': kcal, 'speed': speed};
 
 void main() {
@@ -33,12 +33,13 @@ void main() {
 
   group('informe de la pulsera', () {
     test('se sanea: pulso fuera de 30-230, ritmo absurdo, cifras negativas o texto → null; nunca se inventa', () {
-      final r = WorkoutReport.parse(_rep(hr: 0, pace: 5, dist: -3, kcal: 'x', speed: 400, dur: -1));
+      final r = WorkoutReport.parse(_rep(hr: 0, pace: 5, dist: -3, kcal: 'x', speed: 400000, dur: -1));
       expect(r.heartRate, isNull); expect(r.paceSecKm, isNull); expect(r.distanceM, isNull); expect(r.kcal, isNull); expect(r.speedKmh, isNull); expect(r.durationSec, isNull);
       final ok = WorkoutReport.parse(_rep()); expect(ok.heartRate, 140); expect(ok.distanceM, 1200); expect(ok.paceSecKm, 330); expect(ok.durationSec, 600);
+      expect(ok.kcal, closeTo(80, 1e-9), reason: 'el SDK da calorías (no kcal): 80000 cal = 80 kcal'); expect(ok.speedKmh, closeTo(11.5, 1e-9), reason: 'el SDK da m/h: 11500 m/h = 11,5 km/h');
     });
     test('estado: pausa y fin por el texto del estado', () {
-      expect(WorkoutReport.parse(_rep(run: 'PAUSE')).isPaused, true); expect(WorkoutReport.parse(_rep(run: 'STOPPED')).isEnded, true); expect(WorkoutReport.parse(_rep(run: 'RUNNING')).isEnded, false);
+      expect(WorkoutReport.parse(_rep(run: 'PAUSED')).isPaused, true); expect(WorkoutReport.parse(_rep(run: 'FINISHED')).isEnded, true); expect(WorkoutReport.parse(_rep(run: 'NOT_STARTED')).isEnded, false); expect(WorkoutReport.parse(_rep(run: 'RESUMING')).isPaused, false); expect(WorkoutReport.parse(_rep(run: 'RUNNING')).isEnded, false);
       expect(WorkoutReport.parse({}).heartRate, isNull);
     });
     test('texto del cronómetro y del ritmo', () {
@@ -69,8 +70,8 @@ void main() {
       final w = mk(); for (var i = 0; i < 700; i++) { w.onReport(_rep(hr: 100 + i % 50)); } expect(w.hrSamples.length, LiveWorkout.maxSamples); expect(w.maxHr, 149);
     });
     test('pausa y fin por el estado del informe; terminar no deja la actividad activa', () {
-      final w = mk(); w.onReport(_rep(run: 'PAUSE')); expect(w.paused, true); w.onReport(_rep(run: 'RUNNING')); expect(w.paused, false);
-      w.onReport(_rep(run: 'STOP')); expect(w.active, false);
+      final w = mk(); w.onReport(_rep(run: 'PAUSED')); expect(w.paused, true); w.onReport(_rep(run: 'RUNNING')); expect(w.paused, false);
+      w.onReport(_rep(run: 'FINISHED')); expect(w.active, false);
     });
     test('sin noticias de la pulsera: pasa a «sin datos» y, pasado un tiempo largo, se da por terminada', () {
       final w = mk(give: const Duration(minutes: 10)); w.onReport(_rep()); expect(w.stale, false);
