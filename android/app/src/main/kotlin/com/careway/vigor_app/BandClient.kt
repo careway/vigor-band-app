@@ -390,7 +390,7 @@ object BandClient {
      */
     private val liveSportListener = object : IDeviceSportReportListener {
         override fun onSportControlDataChange(d: SportControlDataInfo) {
-            try { val j = toJson(d); if (debuggable) log("deporte-vivo $j"); emit(mapOf("type" to "sportLive", "data" to j.toMap())) } catch (_: Throwable) {}
+            try { val j = toJson(d); if (debuggable) { log("deporte-vivo $j"); DebugTools.appendLive(j) }; emit(mapOf("type" to "sportLive", "data" to j.toMap())) } catch (_: Throwable) {}
         }
     }
     private fun JSONObject.toMap(): Map<String, Any?> { val o = HashMap<String, Any?>(); val it = keys(); while (it.hasNext()) { val k = it.next(); val v = opt(k); o[k] = if (v == JSONObject.NULL) null else v }; return o }

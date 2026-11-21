@@ -126,3 +126,27 @@ TrackReport filterTrack(List<GpsFix> fixes, {GpsFilterConfig cfg = const GpsFilt
   }
   return TrackReport(out, total: fixes.length, noSignal: noSignal, jumps: jumps, outliers: outliers, rawMeters: raw, filteredMeters: filtered);
 }
+
+/// Estimación APROXIMADA del radio de incertidumbre (m) de la última posición, porque la pulsera no da HDOP ni precisión: se mide cuánto se
+/// desvían los últimos puntos con señal de la recta que mejor los ajusta (mediana de las desviaciones, escalada a una desviación típica) y se
+/// toma el doble y medio. Nunca baja de [floorM] (el GPS de una muñeca rara vez es mejor que unos metros) y crece con el tiempo sin posición
+/// nueva ([growPerSec] m por segundo, hasta [maxM]). Heurística propia, no validada.
+double estimateUncertaintyM(List<GpsFix> fixes, {required int nowT, int window = 12, double floorM = 8, double growPerSec = 0.6, double maxM = 150}) {
+  final v = [for (final f in fixes) if (_validFix(f)) f]..sort((a, b) => a.t.compareTo(b.t));
+  if (v.isEmpty) return maxM;
+  final w = v.length > window ? v.sublist(v.length - window) : v;
+  var sigma = 0.0;
+  if (w.length >= 4) {
+    final la0 = w.first.lat, lo0 = w.first.lng; final kx = math.cos(la0 * math.pi / 180) * _mPerDeg; final t0 = w.first.t.toDouble();
+    final xs = [for (final f in w) (f.lng - lo0) * kx], ys = [for (final f in w) (f.lat - la0) * _mPerDeg], ts = [for (final f in w) f.t - t0];
+    double fit(List<double> a, double t, List<double> ts) { // regresión lineal simple en el tiempo
+      final n = ts.length; final mt = ts.reduce((x, y) => x + y) / n, ma = a.reduce((x, y) => x + y) / n; var num = 0.0, den = 0.0;
+      for (var i = 0; i < n; i++) { num += (ts[i] - mt) * (a[i] - ma); den += (ts[i] - mt) * (ts[i] - mt); }
+      final b = den.abs() < 1e-9 ? 0.0 : num / den; return ma + b * (t - mt);
+    }
+    final res = [for (var i = 0; i < w.length; i++) math.sqrt(math.pow(xs[i] - fit(xs, ts[i], ts), 2) + math.pow(ys[i] - fit(ys, ts[i], ts), 2))];
+    sigma = 1.4826 * _median(res);
+  }
+  final age = math.max(0, nowT - v.last.t);
+  return math.min(maxM, math.max(floorM, 2.5 * sigma) + growPerSec * age);
+}

@@ -39,7 +39,7 @@ class _RoutePanelState extends State<RoutePanel> {
     ];
     return ListenableBuilder(listenable: r, builder: (context, _) => Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       MetricHeader(Icons.route, 'Ruta', c.route), const SizedBox(height: Sp.x3),
-      if (!hasRoute) Text(s.hasGps ? 'La pulsera no obtuvo posición suficiente.' : 'Esta actividad no tiene GPS.', style: VT.body(c).copyWith(color: c.muted))
+      if (!hasRoute) Text(s.hasGps ? 'La pulsera no fijó el GPS. Prueba a cielo abierto y espera a ver «Con señal» en el entreno antes de moverte.' : 'Esta actividad no tiene GPS.', style: VT.body(c).copyWith(color: c.muted))
       else ...[
         RouteMap(segs, tiles: r.mapOn, style: r.mapStyle),
         const SizedBox(height: Sp.x3),

@@ -52,7 +52,7 @@ void main() {
       final nope = Session(key: 'b', start: DateTime(2026), sportType: 1, seconds: 60, meters: 0, kcal: 0, steps: 0, avgHr: 0, paceSecKm: 0, hasGps: false, route: const [], hrPerMinute: const []);
       await pump(t, RoutePanel(noTiles(), nope)); expect(find.text('Esta actividad no tiene GPS.'), findsOneWidget);
       final weak = Session(key: 'c', start: DateTime(2026), sportType: 1, seconds: 60, meters: 0, kcal: 0, steps: 0, avgHr: 0, paceSecKm: 0, hasGps: true, route: const [], hrPerMinute: const []);
-      await pump(t, RoutePanel(noTiles(), weak)); expect(find.textContaining('no obtuvo posición suficiente'), findsOneWidget);
+      await pump(t, RoutePanel(noTiles(), weak)); expect(find.textContaining('no fijó el GPS'), findsOneWidget);
     });
     testWidgets('a 320 px, texto doble y tema oscuro no desborda', (t) async {
       await pump(t, RoutePanel(noTiles(), _sess()), scale: 2, size: const Size(320, 1600), b: Brightness.dark); expect(t.takeException(), isNull);

@@ -145,5 +145,11 @@ object DebugTools {
         }
     }
 
+    /** Solo depuracion: guarda cada informe en vivo de la pulsera (sin posicion ni datos personales) con la hora, para analizar a mano cuanto tarda el GPS en fijar. */
+    fun appendLive(j: JSONObject) {
+        if (!BandClient.debuggable) return
+        try { dumpDir().mkdirs(); val f = File(dumpDir(), "live_reports.jsonl"); if (f.length() > 2_000_000) return; f.appendText(JSONObject(j.toString()).put("t", System.currentTimeMillis()).toString() + "\n") } catch (_: Throwable) {}
+    }
+
     fun clearDumps(): Int { var n = 0; dumpDir().listFiles()?.forEach { if (it.delete()) n++ }; return n }
 }

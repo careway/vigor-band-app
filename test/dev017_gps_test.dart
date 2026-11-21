@@ -61,4 +61,24 @@ void main() {
     expect(GpsFilterConfig.forSport(null).maxSpeed, 15); expect(GpsFilterConfig.forSport(99999).maxSpeed, 15);
   });
   test('haversine: ~111 km por grado de latitud', () { expect(haversineM(0, 0, 1, 0), closeTo(111195, 300)); expect(haversineM(10, 10, 10, 10), 0); });
+
+  group('incertidumbre aproximada', () {
+    test('sin puntos con señal es el máximo; con un track limpio queda cerca del mínimo', () {
+      expect(estimateUncertaintyM(const [], nowT: 0), 150);
+      final f = _line(30); expect(estimateUncertaintyM(f, nowT: f.last.t), closeTo(8, 1.5));
+    });
+    test('el ruido la sube y el tiempo sin posición nueva también', () {
+      final rnd = math.Random(3); final noisy = [for (var i = 0; i < 30; i++) _fix(i * 15.0 + rnd.nextDouble() * 20 - 10, rnd.nextDouble() * 24 - 12, i)];
+      final limpio = _line(30); final t = noisy.last.t;
+      expect(estimateUncertaintyM(noisy, nowT: t), greaterThan(estimateUncertaintyM(limpio, nowT: t)));
+      expect(estimateUncertaintyM(limpio, nowT: t + 60), closeTo(estimateUncertaintyM(limpio, nowT: t) + 36, 1));
+    });
+    test('nunca baja del mínimo ni pasa del máximo, y los puntos sin señal no cuentan', () {
+      final f = _line(30); for (var i = 0; i < f.length; i++) { if (i > 5) f[i] = GpsFix(f[i].lat, f[i].lng, f[i].t, 0); }
+      final u = estimateUncertaintyM(f, nowT: 100000); expect(u, 150); expect(estimateUncertaintyM(_line(30), nowT: _line(30).last.t), greaterThanOrEqualTo(8));
+    });
+    test('con pocos puntos (menos de 4) usa el mínimo más el tiempo transcurrido', () {
+      final f = _line(3); expect(estimateUncertaintyM(f, nowT: f.last.t), 8);
+    });
+  });
 }

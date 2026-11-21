@@ -17,26 +17,35 @@ Future<Style> _readStyle(MapStyle m) => _styles.putIfAbsent(m, () => StyleReader
 /// [tiles] = false: no se descarga nada (ajuste «Mapa de fondo» apagado) y se usa el dibujo propio.
 class RouteMap extends StatelessWidget {
   final List<List<(double, double)>> segments; final bool tiles; final double height; final MapStyle style;
-  const RouteMap(this.segments, {super.key, this.tiles = true, this.height = 260, this.style = MapStyle.byDefault});
+  /// Posición actual (si se conoce) y radio de incertidumbre aproximado en metros: se dibuja un círculo traslúcido a escala real.
+  final (double, double)? position; final double? uncertaintyM;
+  const RouteMap(this.segments, {super.key, this.tiles = true, this.height = 260, this.style = MapStyle.byDefault, this.position, this.uncertaintyM});
 
   @override
   Widget build(BuildContext context) {
     final c = VC.of(context);
-    final all = [for (final s in segments) ...s];
-    if (all.length < 2) return const SizedBox.shrink();
+    final all = [for (final s in segments) ...s, ?position];
+    if (all.length < 2 && position == null) return const SizedBox.shrink();
     if (!tiles) {
       return SizedBox(height: height, child: CustomPaint(size: Size.infinite, painter: RoutePainter([for (final s in segments) ...[...s, (double.nan, double.nan)]], c.route, c.kcal, c.surface)));
     }
     final lines = [for (final s in segments) if (s.length >= 2) [for (final p in s) LatLng(p.$1, p.$2)]];
-    final bounds = LatLngBounds.fromPoints([for (final p in all) LatLng(p.$1, p.$2)]);
+    final pos = position == null ? null : LatLng(position!.$1, position!.$2);
+    final pts = [for (final p in all) LatLng(p.$1, p.$2)];
+    final single = all.length < 2 || (pts.length > 1 && pts.every((p) => p == pts.first)); // un solo punto: no hay caja, se centra
     final first = LatLng(all.first.$1, all.first.$2), last = LatLng(all.last.$1, all.last.$2);
     Widget map(Widget base) => FlutterMap(
-          options: MapOptions(initialCameraFit: CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(28), maxZoom: 18),
+          options: MapOptions(initialCameraFit: single ? null : CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: const EdgeInsets.all(28), maxZoom: 18), initialCenter: single ? pts.first : const LatLng(0, 0), initialZoom: single ? 17 : 2,
               interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag | InteractiveFlag.doubleTapZoom), minZoom: 3, maxZoom: 19),
           children: [
             base,
             PolylineLayer(polylines: [for (final l in lines) Polyline(points: l, strokeWidth: 5, color: c.route, borderStrokeWidth: 2.5, borderColor: Colors.white.withValues(alpha: .9), strokeCap: StrokeCap.round, strokeJoin: StrokeJoin.round)]),
-            MarkerLayer(markers: [Marker(point: first, width: 22, height: 22, child: const _Dot(Color(0xFF16A34A))), Marker(point: last, width: 22, height: 22, child: const _Dot(Color(0xFFDC2626)))]),
+            if (pos != null && uncertaintyM != null) CircleLayer(circles: [CircleMarker(point: pos, radius: uncertaintyM!, useRadiusInMeter: true, color: c.accent.withValues(alpha: .18), borderColor: c.accent.withValues(alpha: .7), borderStrokeWidth: 1.5)]),
+            MarkerLayer(markers: [
+              if (pos == null || lines.isNotEmpty) Marker(point: first, width: 22, height: 22, child: const _Dot(Color(0xFF16A34A))),
+              if (pos == null && !single) Marker(point: last, width: 22, height: 22, child: const _Dot(Color(0xFFDC2626))),
+              if (pos != null) Marker(point: pos, width: 26, height: 26, child: _Dot(c.accent)),
+            ]),
             // Atribución obligatoria (licencias ODbL, OpenMapTiles y de cada servidor): visible y con enlace.
             Align(alignment: Alignment.bottomRight, child: Padding(padding: const EdgeInsets.all(4), child: Material(color: Colors.white.withValues(alpha: .8), borderRadius: BorderRadius.circular(6),
               child: InkWell(borderRadius: BorderRadius.circular(6), onTap: () { try { _mc.invokeMethod('openUrl', {'url': 'https://www.openstreetmap.org/copyright'}); } catch (_) {} },

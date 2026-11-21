@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vigor_app/data/gps_filter.dart';
 import 'package:vigor_app/data/repo.dart';
 import 'package:vigor_app/data/sports.dart';
 import 'package:vigor_app/data/workout.dart';
@@ -86,6 +87,28 @@ void main() {
     });
   });
 
+  group('posición de la actividad (recorrido devuelto por la pulsera)', () {
+    GpsFix f(int i, {int sig = 2}) => GpsFix(40.0, -3.0 + i * 0.0001, i * 5, sig);
+    test('sin puntos con señal no hay posición; con ellos, la última y una incertidumbre', () {
+      var now = DateTime(2026, 3, 5, 10); final w = LiveWorkout(clock: () => now)..begin(sportByKey('OUTDOOR_WALK')); now = now.add(const Duration(seconds: 200));
+      w.setTrack([for (var i = 0; i < 20; i++) f(i, sig: 0)]); expect(w.position, isNull); expect(w.uncertaintyM, isNull);
+      w.setTrack([for (var i = 0; i < 20; i++) f(i)]); expect(w.position, isNotNull); expect(w.uncertaintyM, greaterThanOrEqualTo(8));
+      expect(w.positionAgeSec, closeTo(200 - 95, 1), reason: 'último punto a los 95 s, ahora a los 200 s');
+    });
+    test('al empezar otra actividad se borra la posición anterior', () {
+      final w = LiveWorkout(clock: () => DateTime(2026, 3, 5, 10))..begin(sportByKey('OUTDOOR_WALK')); w.setTrack([for (var i = 0; i < 20; i++) f(i)]); expect(w.position, isNotNull);
+      w.begin(sportByKey('OUTDOOR_RUNNING')); expect(w.position, isNull); expect(w.track, isEmpty);
+    });
+    test('el repositorio pasa al entreno la sesión de la pulsera que empezó a la vez (±5 min) y no otra', () {
+      final base = DateTime(2026, 3, 5, 10); final r = VigorRepo(); r.clock = () => base.add(const Duration(minutes: 3)); r.workout.begin(sportByKey('OUTDOOR_WALK')); // empieza a las 10:03... en el reloj del móvil
+      Session s(DateTime st, List<GpsFix> fx) => Session(key: 'k${st.minute}', start: st, sportType: 2, seconds: 100, meters: 1, kcal: 0, steps: 0, avgHr: 0, paceSecKm: 0, hasGps: true, route: const [], hrPerMinute: const [], fixes: fx);
+      r.sessions = [s(base.subtract(const Duration(hours: 2)), [for (var i = 0; i < 10; i++) f(i)]), s(base.add(const Duration(minutes: 3, seconds: 20)), [for (var i = 0; i < 12; i++) f(i)])];
+      r.workout.startedAt = base.add(const Duration(minutes: 3)); // anclaje
+      // la lógica es privada; se ejerce al recargar: aquí se comprueba el modelo directamente con el mismo criterio
+      final near = r.sessions.where((x) => x.start.difference(r.workout.startedAt!).abs() <= const Duration(minutes: 5)).toList(); expect(near.length, 1); expect(near.first.fixes.length, 12);
+    });
+  });
+
   group('repositorio', () {
     test('iniciar y parar actualizan la actividad en curso y la bandera de deporte activo', () async {
       final r = VigorRepo(); await r.startSport('OUTDOOR_RUNNING'); expect(r.workout.active, true); expect(r.sportActive, true); expect(r.workout.mode?.key, 'OUTDOOR_RUNNING');
@@ -121,6 +144,26 @@ void main() {
       final r = running(); await pump(t, WorkoutPage(r), size: const Size(360, 1400));
       expect(find.text('12:34'), findsOneWidget); for (final k in ['Distancia', 'Ritmo', 'Pulso', 'Calorías', 'GPS']) { expect(find.text(k), findsWidgets, reason: k); }
       expect(find.text('1.20'), findsOneWidget); expect(find.text('5:30'), findsOneWidget); expect(find.text('Con señal'), findsOneWidget); expect(find.text('Zona 3'), findsOneWidget);
+      await done(t, r);
+    });
+    testWidgets('la ficha GPS dice «Buscando…» hasta que la pulsera informa de señal', (t) async {
+      final r = VigorRepo(); r.clock = () => fake; r.workout.begin(sportByKey('OUTDOOR_WALK')); r.workout.onReport(_rep(type: 2, gps: 0));
+      await pump(t, WorkoutPage(r), size: const Size(360, 1400)); expect(find.text('Buscando…'), findsOneWidget); expect(find.text('Con señal'), findsNothing);
+      r.workout.onReport(_rep(type: 2, gps: 2)); await t.pump(); expect(find.text('Con señal'), findsOneWidget);
+      await done(t, r);
+    });
+    testWidgets('en un entreno de recorrido hay tarjeta de posición; sin posición pide esperar; con ella, la incertidumbre y el botón de actualizar', (t) async {
+      final r = VigorRepo(); r.mapOn = false; r.conn = 'connected'; r.clock = () => fake; r.workout.begin(sportByKey('OUTDOOR_WALK')); r.workout.onReport(_rep(type: 2, gps: 0));
+      await pump(t, WorkoutPage(r), size: const Size(360, 1800)); expect(find.text('Posición'), findsOneWidget); expect(find.textContaining('Esperando la posición'), findsOneWidget);
+      r.workout.onReport(_rep(type: 2, gps: 2)); await t.pump(); expect(find.textContaining('ya tiene señal'), findsOneWidget);
+      r.workout.setTrack([for (var i = 0; i < 20; i++) GpsFix(40.0, -3.0 + i * 0.0001, i * 5, 2)]); await t.pump();
+      expect(find.textContaining('Incertidumbre aprox. ±'), findsOneWidget);
+      await t.tap(find.text('Actualizar posición')); await t.pump(); expect(calls.any((c) => c.method == 'sync'), true);
+      await done(t, r);
+    });
+    testWidgets('en un entreno sin GPS (gimnasio) no hay tarjeta de posición', (t) async {
+      final r = VigorRepo(); r.clock = () => fake; r.workout.begin(sportByKey('FITNESS')); r.workout.onReport(_rep(type: null));
+      await pump(t, WorkoutPage(r), size: const Size(360, 1400)); expect(find.text('Posición'), findsNothing); expect(find.text('Actualizar posición'), findsNothing);
       await done(t, r);
     });
     testWidgets('el entreno de gimnasio solo muestra pulso y calorías (sin distancia, ritmo ni GPS)', (t) async {

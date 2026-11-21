@@ -5,6 +5,7 @@ import '../data/repo.dart';
 import '../data/workout.dart';
 import '../theme/tokens.dart';
 import 'fx.dart';
+import 'route_map.dart';
 import 'sport_picker.dart';
 import 'widgets.dart';
 
@@ -69,6 +70,7 @@ class WorkoutPage extends StatelessWidget {
                 Text(w.active ? _stateText(w) : 'Actividad terminada', style: VT.caption(c).copyWith(color: w.active && !w.stale && !w.paused ? col : c.muted, fontWeight: FontWeight.w700)),
               ]))),
             ])),
+            if (workoutFields(m).contains(WorkoutField.gps)) _LiveMapCard(repo, w),
             LayoutBuilder(builder: (context, bc) {
               final tile = (bc.maxWidth - Sp.x3) / 2;
               return Wrap(spacing: Sp.x3, runSpacing: Sp.x3, children: [for (final f in workoutFields(m)) SizedBox(width: tile, child: _MetricTile(f, w, repo))]);
@@ -94,6 +96,27 @@ class WorkoutPage extends StatelessWidget {
   }
 }
 
+/// Mapa de la actividad de recorrido con la última posición que devolvió la pulsera y un círculo con su incertidumbre aproximada. La pulsera no
+/// informa de la posición en directo: llega al sincronizar, de modo que «Actualizar posición» lee lo grabado hasta ahora (experimental).
+class _LiveMapCard extends StatelessWidget {
+  final VigorRepo repo; final LiveWorkout w; const _LiveMapCard(this.repo, this.w);
+  @override
+  Widget build(BuildContext context) {
+    final c = VC.of(context); final pos = w.position; final u = w.uncertaintyM; final age = w.positionAgeSec;
+    final canUpdate = w.active && repo.conn == 'connected' && !repo.syncing;
+    return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      MetricHeader(Icons.gps_fixed, 'Posición', c.route), const SizedBox(height: Sp.x3),
+      if (pos == null) Text((w.gpsSignal ?? 0) > 0 ? 'La pulsera ya tiene señal. La posición aparece al actualizar.' : 'Esperando la posición de la pulsera…', style: VT.body(c).copyWith(color: c.muted))
+      else ...[
+        RouteMap([[for (final f in w.track) if (f.signal > 0) (f.lat, f.lng)]], tiles: repo.mapOn, style: repo.mapStyle, position: pos, uncertaintyM: u, height: 230),
+        Padding(padding: const EdgeInsets.only(top: Sp.x2), child: Text('Incertidumbre aprox. ±${u?.round() ?? '—'} m${age == null ? '' : ' · posición de hace ${age < 90 ? '$age s' : '${age ~/ 60} min'}'}', style: VT.caption(c))),
+      ],
+      const SizedBox(height: Sp.x2),
+      SizedBox(height: 48, child: OutlinedButton.icon(onPressed: canUpdate ? repo.sync : null, icon: const Icon(Icons.refresh), label: Text(repo.syncing ? 'Actualizando…' : 'Actualizar posición'))),
+    ]));
+  }
+}
+
 class _MetricTile extends StatelessWidget {
   final WorkoutField f; final LiveWorkout w; final VigorRepo repo;
   const _MetricTile(this.f, this.w, this.repo);
@@ -106,7 +129,7 @@ class _MetricTile extends StatelessWidget {
       WorkoutField.speed => (Icons.speed, 'Velocidad', w.speedKmh == null ? '—' : w.speedKmh!.toStringAsFixed(1), 'km/h', c.accent),
       WorkoutField.heartRate => (Icons.favorite, 'Pulso', w.heartRate == null ? '—' : '${w.heartRate}', 'bpm', c.heart),
       WorkoutField.calories => (Icons.local_fire_department, 'Calorías', w.kcal == null ? '—' : '${w.kcal!.round()}', 'kcal', c.kcal),
-      WorkoutField.gps => (Icons.gps_fixed, 'GPS', w.gpsSignal == null ? '—' : (w.gpsSignal! > 0 ? 'Con señal' : 'Sin señal'), '', c.steps),
+      WorkoutField.gps => (Icons.gps_fixed, 'GPS', (w.gpsSignal ?? 0) > 0 ? 'Con señal' : 'Buscando…', '', (w.gpsSignal ?? 0) > 0 ? c.steps : c.muted),
     };
     final zone = f == WorkoutField.heartRate ? w.zone(hrMaxTanaka(repo.age)) : null;
     return Semantics(container: true, label: '$label: $value $unit${zone != null && zone > 0 ? ', zona $zone' : ''}', child: ExcludeSemantics(child: Container(

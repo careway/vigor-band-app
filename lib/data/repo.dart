@@ -355,6 +355,15 @@ class VigorRepo extends ChangeNotifier {
     } catch (_) { return <Map>[]; } // un tipo ilegible no debe impedir cargar el resto
   }
 
+  /// Si hay una actividad de recorrido en curso y la pulsera ya devolvió su sesión (al sincronizar), pasa sus puntos al entreno para dibujar la posición.
+  /// La sesión se reconoce por su hora de inicio (±5 min respecto al inicio en el móvil: los relojes pueden no coincidir exactamente).
+  void _trackForWorkout() {
+    final w = workout; final st = w.startedAt; if (!w.active || st == null || !(w.mode?.tracksRoute ?? false)) return;
+    Session? best; Duration? bd;
+    for (final s in sessions) { final d = s.start.difference(st).abs(); if (d <= const Duration(minutes: 5) && (bd == null || d < bd)) { best = s; bd = d; } }
+    if (best != null && best.fixes.isNotEmpty) w.setTrack(best.fixes);
+  }
+
   Future<void> reload() async {
     final o5 = await _list('origin5'), spo = await _list('spo2'), hv = await _list('hrv'), sl = await _list('sleep');
     final sp = await _list('sports'), si = await _list('sportItems'), live = await _list('live');
@@ -448,6 +457,7 @@ class VigorRepo extends ChangeNotifier {
         if (t.year == n.year && t.month == n.month && t.day == n.day) liveSteps = _n(live.first['step']).toDouble();
       }
     }
+    _trackForWorkout();
     loaded = true; notifyListeners();
   }
 

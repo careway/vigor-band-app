@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'analysis.dart';
+import 'gps_filter.dart';
 import 'sports.dart';
 
 /// Datos que puede mostrar la pantalla de entreno (el tiempo siempre se muestra aparte, grande).
@@ -59,9 +60,21 @@ class LiveWorkout extends ChangeNotifier {
   /// Pulso de cada informe, para la gráfica (como mucho [maxSamples]).
   final hrSamples = <int>[]; static const maxSamples = 600;
   int maxHr = 0;
+  /// Recorrido que la pulsera ha devuelto de esta actividad (solo llega al sincronizar, no en directo) y la última posición con su incertidumbre aprox.
+  List<GpsFix> track = const []; (double, double)? position; double? uncertaintyM; int? positionAgeSec;
+
+  /// Actualiza el recorrido con los puntos que devolvió la pulsera (instantes en segundos desde el inicio). Sin puntos con señal, no hay posición.
+  void setTrack(List<GpsFix> fixes) {
+    track = fixes; final rep = filterTrack(fixes);
+    final last = rep.segments.isEmpty ? null : rep.segments.last.last;
+    position = last; final now = elapsed().inSeconds;
+    uncertaintyM = last == null ? null : estimateUncertaintyM(fixes, nowT: now);
+    final lastT = [for (final f in fixes) if (f.signal > 0 && !(f.lat == 0 && f.lng == 0)) f.t]; positionAgeSec = lastT.isEmpty ? null : (now - lastT.reduce((a, b) => a > b ? a : b)).clamp(0, 1 << 30);
+    notifyListeners();
+  }
 
   void begin(SportMode? m) { _reset(); active = true; mode = m; startedAt = _clock(); notifyListeners(); }
-  void _reset() { paused = false; heartRate = gpsSignal = null; distanceM = paceSecKm = speedKmh = kcal = null; hrSamples.clear(); maxHr = 0; lastReport = null; }
+  void _reset() { track = const []; position = null; uncertaintyM = null; positionAgeSec = null; paused = false; heartRate = gpsSignal = null; distanceM = paceSecKm = speedKmh = kcal = null; hrSamples.clear(); maxHr = 0; lastReport = null; }
 
   void onReport(Map<dynamic, dynamic> d) {
     final r = WorkoutReport.parse(d); final now = _clock();
