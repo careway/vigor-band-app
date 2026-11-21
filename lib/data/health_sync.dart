@@ -18,7 +18,7 @@ enum HealthCat {
   heart('corazon', 'Corazón', 'Pulso (1 lectura por minuto), variabilidad RMSSD calculada por Vigor (solo Health Connect) y pulso en reposo nocturno estimado por Vigor (solo Health Connect).', true),
   oxygen('oxigeno', 'Oxígeno en sangre', 'SpO₂ de la pulsera (valores orientativos, no diagnósticos).', true),
   temperature('temperatura', 'Temperatura corporal (aprox.)', 'Temperatura corporal estimada en la muñeca. Puede tener un sesgo de ±1,5 °C: por eso está desactivada de serie.', false),
-  sleep('sueno', 'Sueño', 'Hora de dormir y de despertar de cada noche (sin fases: la pulsera solo da totales).', true),
+  sleep('sueno', 'Sueño', 'Cada noche como una sesión, con sus fases (ligero, profundo, REM y despierto) cuando la pulsera las da.', true),
   exercise('ejercicio', 'Ejercicio', 'Sesiones deportivas: tipo de deporte, inicio, fin, duración, distancia y calorías.', true),
   route('ruta', 'Rutas GPS de los ejercicios', 'Los puntos de ubicación de cada recorrido, asociados a su ejercicio. Es un dato sensible: desactivado de serie. Requiere «Ejercicio».', false);
 
@@ -50,7 +50,23 @@ enum HealthAvail { ready, unsupported, notInstalled, updateRequired }
 /// Un dato puntual o por intervalo a escribir.
 class HealthItem {
   final HType type; final HealthCat cat; final String id; final DateTime start, end; final double value; final double version;
-  const HealthItem(this.type, this.cat, this.id, this.start, this.end, this.value, {this.version = 1});
+  /// Solo sueño: fases de la noche. La pasarela las escribe dentro de UNA sesión y marca [SleepStagesOut.written].
+  final SleepStagesOut? stages;
+  const HealthItem(this.type, this.cat, this.id, this.start, this.end, this.value, {this.version = 1, this.stages});
+}
+
+/// Fases de una noche como tramos [inicio ms, fin ms, tipo de fase de Health Connect: 1 despierto, 4 ligero, 5 profundo, 6 REM].
+class SleepStagesOut {
+  final List<List<int>> runs; bool written = false;
+  SleepStagesOut(this.runs);
+  /// Agrupa el hipnograma por minuto en tramos consecutivos de la misma fase. Vacío si no hay fases.
+  static SleepStagesOut? fromNight(Night n) {
+    final st = n.stages, start = n.start; if (st == null || st.isEmpty || start == null) return null;
+    int code(Stage s) => switch (s) { Stage.awake => 1, Stage.light => 4, Stage.deep => 5, Stage.rem => 6 };
+    final out = <List<int>>[]; var i = 0; final t0 = start.millisecondsSinceEpoch;
+    while (i < st.length) { var j = i; while (j < st.length && st[j] == st[i]) { j++; } out.add([t0 + i * 60000, t0 + j * 60000, code(st[i])]); i = j; }
+    return SleepStagesOut(out);
+  }
 }
 
 class WorkoutOut {
@@ -98,6 +114,9 @@ class HealthSource {
 
 /// Tope de escrituras densas por ronda (Health Connect limita las peticiones por hora).
 const kMaxDensePerRun = 400;
+
+/// Se suma a la version de la noche cuando se envía con fases (debe ser mayor que cualquier version sin fases).
+const kStagedVersionOffset = 1000000000;
 
 class HealthSync extends ChangeNotifier {
   HealthSync({required this.gateway, required this.savePref, required this.loadLedger, required this.saveLedger, DateTime Function()? clock, this.batch = 25}) : clock = clock ?? DateTime.now;
@@ -379,11 +398,15 @@ class HealthSync extends ChangeNotifier {
       if (s == null || e == null || !e.isAfter(s) || s.isBefore(floor) || n.total <= 0) continue;
       nightsValid++;
       final ver = e.millisecondsSinceEpoch ~/ 60000;
-      if (sent[n.date] == ver) { catLastOk.putIfAbsent(HealthCat.sleep, () => '${_dm(s)} ${_hm(s)}–${_hm(e)}'); continue; }
-      bool ok; try { ok = await gateway.write(HealthItem(HType.sleep, HealthCat.sleep, 'vigor-sleep-${n.date}', s, e, n.total.toDouble(), version: ver.toDouble())); } catch (x) { ok = false; _ledger['lastEx'] = x.runtimeType.toString(); }
+      // Con fases la version sube: Health Connect sustituye la sesion sin fases enviada antes (mismo identificador de registro).
+      final stagesOut = SleepStagesOut.fromNight(n);
+      final want = stagesOut != null && !gateway.isIos ? ver + kStagedVersionOffset : ver;
+      if (sent[n.date] == want) { catLastOk.putIfAbsent(HealthCat.sleep, () => '${_dm(s)} ${_hm(s)}–${_hm(e)}'); continue; }
+      bool ok; try { ok = await gateway.write(HealthItem(HType.sleep, HealthCat.sleep, 'vigor-sleep-${n.date}', s, e, n.total.toDouble(), version: want.toDouble(), stages: want == ver ? null : stagesOut)); } catch (x) { ok = false; _ledger['lastEx'] = x.runtimeType.toString(); }
       if (!ok) { errors++; _fail(HealthCat.sleep); break; }
       catError.remove(HealthCat.sleep); catLastOk[HealthCat.sleep] = '${_dm(s)} ${_hm(s)}–${_hm(e)}';
-      sent[n.date] = ver; _ledger['first'] ??= s.millisecondsSinceEpoch; lastCount++;
+      // Si Health Connect no aceptó las fases, se guardó la sesión sin ellas con la version base: se reintentará con fases.
+      sent[n.date] = (want == ver || stagesOut!.written) ? want : ver; _ledger['first'] ??= s.millisecondsSinceEpoch; lastCount++;
     }
     return errors;
   }

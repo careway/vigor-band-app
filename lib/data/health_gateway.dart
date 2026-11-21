@@ -75,12 +75,24 @@ class PlatformHealthGateway implements HealthGateway {
     _err = null;
     try {
       await _cfg();
+      // Sueño con fases (solo Android): UNA sesión con todas las fases, escrita en Kotlin con el cliente de Health Connect.
+      // Si falla (o no hay fases) se cae a la sesión sin fases de siempre, para no perder la noche.
+      final st = it.stages;
+      if (it.type == HType.sleep && !isIos && st != null && st.runs.isNotEmpty) {
+        try {
+          final code = await _ch.invokeMethod<String>('writeSleepStages', {
+            'id': it.id, 'version': it.version.round(), 'start': it.start.millisecondsSinceEpoch, 'end': it.end.millisecondsSinceEpoch, 'stages': st.runs});
+          if (code == 'OK') { st.written = true; return true; }
+          _err = 'fases del sueño no escritas (${code ?? 'sin respuesta'}); se envió la noche sin fases';
+        } catch (e) { _err = 'fases del sueño no escritas (${_short(e)}); se envió la noche sin fases'; }
+      }
+      final plainErr = _err;
       Future<bool> w(HealthDataType t) => _h.writeHealthData(value: it.value, type: t, startTime: it.start, endTime: it.end,
           clientRecordId: isIos ? null : it.id, clientRecordVersion: isIos ? null : it.version, recordingMethod: RecordingMethod.automatic);
       var ok = await w(type);
       // Cobertura: si Health Connect rechaza la sesión de sueño, se prueba con una etapa «dormido» (mismo permiso WRITE_SLEEP).
       if (!ok && it.type == HType.sleep && !isIos) ok = await w(HealthDataType.SLEEP_ASLEEP);
-      if (!ok) _err = 'el sistema rechazó la escritura (sin detalle; ver logcat FLUTTER_HEALTH)';
+      if (!ok) { _err = 'el sistema rechazó la escritura (sin detalle; ver logcat FLUTTER_HEALTH)'; } else { _err = plainErr; }
       return ok;
     } catch (e) { _err = _short(e); return false; }
   }

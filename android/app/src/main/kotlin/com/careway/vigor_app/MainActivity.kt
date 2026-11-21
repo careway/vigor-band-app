@@ -116,6 +116,12 @@ class MainActivity : FlutterFragmentActivity() {
                             runOnUiThread { try { if (n >= 0) result.success(n) else result.error("STORE", "no se pudo borrar", null) } catch (_: Throwable) {} }
                         }
                     }
+                    "writeSleepStages" -> {
+                        val id = call.argument<String>("id") ?: ""; val ver = (call.argument<Number>("version") ?: 1).toLong()
+                        val st = (call.argument<Number>("start") ?: 0).toLong(); val en = (call.argument<Number>("end") ?: 0).toLong()
+                        val raw = (call.argument<List<List<Number>>>("stages") ?: emptyList()).map { r -> r.map { it.toLong() } }
+                        SleepStageWriter.write(applicationContext, id, ver, st, en, raw) { code -> android.util.Log.i("VIGORLOG", "writeSleepStages " + code); runOnUiThread { try { result.success(code) } catch (_: Throwable) {} } }
+                    }
                     "openHealthSettings" -> result.success(openHealthSettings())
                     "healthLoad" -> ioExec.execute {
                         val out = try { BandClient.store.healthState() } catch (e: Throwable) { null }

@@ -74,6 +74,7 @@ dependencies {
     implementation("no.nordicsemi.android.support.v18:scanner:1.4.2")
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.health.connect:connect-client:1.2.0-alpha02") // misma version que el plugin `health`: sesion de sueno con fases
     // Tests unitarios JVM (logica pura de Kotlin). org.json real: el de android.jar solo tiene metodos vacios en la JVM.
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
