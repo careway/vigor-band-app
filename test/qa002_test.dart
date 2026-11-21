@@ -92,7 +92,8 @@ void main() {
       await send({'type': 'sync', 'value': 'start'}); expect(r.syncing, isTrue);
       await send({'type': 'sync', 'value': 'end'}); expect(r.syncing, isFalse);
       await Future<void>.delayed(Duration.zero);
-      expect(getData, greaterThan(base)); expect(r.lastSync, isNotNull);
+      expect(getData, greaterThan(base)); expect(r.lastSync, isNull); // DEV_012: una sincronización no correcta no cuenta como «última»
+      await send({'type': 'sync', 'value': 'start'}); await send({'type': 'sync', 'value': 'end', 'ok': true, 'at': 1900000000000}); expect(r.lastSync, DateTime.fromMillisecondsSinceEpoch(1900000000000));
       await send({'type': 'state', 'value': 'disconnected'}); expect(r.conn, 'disconnected');
       r.dispose();
     });

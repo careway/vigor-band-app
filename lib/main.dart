@@ -49,7 +49,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void dispose() { WidgetsBinding.instance.removeObserver(this); super.dispose(); }
   /// Al volver a primer plano: comprobar versión (silencioso, con límite de 15 min).
   @override
-  void didChangeAppLifecycleState(AppLifecycleState s) { if (s == AppLifecycleState.resumed) repo.updater.onResume(); }
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) { repo.updater.onResume(); repo.auto.onResume(); }
+    else if (s == AppLifecycleState.paused) { repo.auto.onPause(); }
+  }
   @override
   Widget build(BuildContext context) => ListenableBuilder(listenable: repo, builder: (context, _) {
         final c = VC.of(context);

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'analysis.dart';
+import 'auto_sync.dart';
 import 'health_gateway.dart';
 import 'health_sync.dart';
 import 'heart_meter.dart';
@@ -92,6 +93,30 @@ class VigorRepo extends ChangeNotifier {
   Future<void> setThemeMode(int v) async { themeMode = v.clamp(0, 2); await _m.invokeMethod('setPref', {'key': 'theme', 'value': themeMode}); notifyListeners(); }
   DateTime Function() clock = DateTime.now;
   StreamSubscription? _sub;
+  /// Sincronización automática (DEV_012). Ajustes guardados en Kotlin (vigor_sync): interruptor, intervalo, «solo con pantalla encendida» y exportación sin la app.
+  bool autoOn = true, screenOnly = true, bgExport = true; int autoMin = kAutoSyncDefaultMin; DateTime? lastBg; String bgResult = '';
+  late final auto = AutoSync(clock: () => clock(), connState: () => conn, hasMac: () => savedMac != null, lastSync: () => lastSync,
+      busy: () => syncing || live.reading || heart.active || sportActive || privacyBusy || !loaded,
+      connect: _autoConnect, sync: () async { await _m.invokeMethod('sync'); });
+  Future<void> _autoConnect() async {
+    // Sin diálogos: si falta el permiso de Bluetooth no se insiste desde aquí.
+    if (savedMac == null || await _m.invokeMethod<bool>('hasConnectPermission') != true) return;
+    await _m.invokeMethod('connect', {'mac': savedMac, 'pwd': '0000'});
+  }
+  void _readSyncInfo(dynamic i) {
+    if (i is! Map) return;
+    autoOn = i['enabled'] != false; screenOnly = i['screenOnly'] != false; bgExport = i['bgExport'] != false; autoMin = safeAutoMin((i['minutes'] as num?)?.toInt());
+    final ok = (i['lastOkAt'] as num?)?.toInt() ?? 0; if (ok > 0) lastSync = DateTime.fromMillisecondsSinceEpoch(ok);
+    final bg = (i['bgAt'] as num?)?.toInt() ?? 0; lastBg = bg > 0 ? DateTime.fromMillisecondsSinceEpoch(bg) : null; bgResult = '${i['bgResult'] ?? ''}';
+    auto.enabled = autoOn; auto.intervalMin = autoMin;
+  }
+  Future<void> setAutoSync({bool? enabled, int? minutes, bool? screenOnlyOnly, bool? bgExportOn}) async {
+    try {
+      _readSyncInfo(await _m.invokeMethod('setAutoSync', {'enabled': ?enabled, 'minutes': ?(minutes == null ? null : safeAutoMin(minutes)), 'screenOnly': ?screenOnlyOnly, 'bgExport': ?bgExportOn}));
+    } catch (_) {}
+    if (enabled != null) auto.setEnabled(enabled);
+    notifyListeners();
+  }
   /// Medición puntual de pulso (SDK startDetectHeart). Solo mide cuando el usuario lo pide.
   late final heart = HeartMeter(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'), isConnected: () => conn == 'connected');
   final updater = Updater();
@@ -131,16 +156,25 @@ class VigorRepo extends ChangeNotifier {
       themeMode = ((p['theme'] as num?)?.toInt() ?? 0).clamp(0, 2);
       healthPrefs = Map<dynamic, dynamic>.from(p);
     } catch (e) { loadError = 'preferencias: ${e.runtimeType}'; }
+    try { _readSyncInfo(await _m.invokeMethod('syncInfo')); } catch (_) {}
     try { await reload(); } catch (e) { loadError = 'datos: ${e.runtimeType}'; loaded = true; }
     try { await health.init(healthPrefs); } catch (_) {}
     try { agps = await _m.invokeMethod<Map>('agpsStatus') ?? {}; } catch (_) {}
     notifyListeners();
     unawaited(updater.init());
     if (savedMac != null) { try { await connectSaved(); } catch (_) {} }
+    // Datos que el trabajo de fondo guardó y no pudo enviar a Health Connect (o no llegó a enviar): se envían ahora (opción B de respaldo).
+    try { final i = await _m.invokeMethod('syncInfo'); if (i is Map && i['dirty'] == true && health.master) unawaited(_exportThenClear()); } catch (_) {}
+    auto.onResume();
+  }
+
+  Future<void> _exportThenClear() async {
+    await health.run();
+    if (health.master && health.state != HealthState.error) { try { await _m.invokeMethod('clearExportDirty'); } catch (_) {} }
   }
 
   @override
-  void dispose() { _sub?.cancel(); live.dispose(); heart.dispose(); updater.dispose(); health.dispose(); super.dispose(); }
+  void dispose() { _sub?.cancel(); auto.dispose(); live.dispose(); heart.dispose(); updater.dispose(); health.dispose(); super.dispose(); }
 
   void _onEvent(dynamic ev) {
     if (ev is! Map) return;
@@ -156,7 +190,11 @@ class VigorRepo extends ChangeNotifier {
       case 'battery': final pc = m['percent']; if (pc is num) battery = pc.toInt(); charging = m['charging'] == true;
       case 'sync':
         syncing = m['value'] == 'start';
-        if (!syncing) { lastSync = DateTime.now(); reload().then((_) { if (health.master) unawaited(health.run()); }, onError: (_) {}); }
+        if (!syncing) {
+          // «Última sincronización» solo cuenta si fue correcta (Kotlin manda ok y la hora).
+          if (m['ok'] == true) { final at = (m['at'] as num?)?.toInt(); lastSync = at != null && at > 0 ? DateTime.fromMillisecondsSinceEpoch(at) : clock(); }
+          reload().then((_) { if (health.master) unawaited(_exportThenClear()); }, onError: (_) {});
+        }
       case 'syncProgress': final pv = m['value']; if (pv is num) progress = pv.toDouble();
       case 'sport': sportMsgs.insert(0, '${m['msg']}'); if ('${m['msg']}' == 'Actividad detenida') sportActive = false;
       case 'autoMeasure':
@@ -168,6 +206,7 @@ class VigorRepo extends ChangeNotifier {
       case 'log': logs.insert(0, '${m['msg']}'); if (logs.length > 200) logs.removeLast();
     }
     notifyListeners();
+    auto.evaluate();
   }
 
   Future<void> setPref(String k, int v) async {
@@ -192,16 +231,17 @@ class VigorRepo extends ChangeNotifier {
   Future<void> debugClearDumps() => _m.invokeMethod('debugClearDumps');
 
   Future<bool> _perm(bool scan) async => await _m.invokeMethod<bool>('requestPermissions', {'scan': scan}) ?? false;
-  Future<void> connectSaved() async { if (savedMac == null || !await _perm(false)) return; await _m.invokeMethod('connect', {'mac': savedMac, 'pwd': '0000'}); }
+  Future<void> connectSaved() async { auto.userHold = false; if (savedMac == null || !await _perm(false)) return; await _m.invokeMethod('connect', {'mac': savedMac, 'pwd': '0000'}); }
   Future<void> scan() async { if (!await _perm(true)) { logs.insert(0, 'Faltan permisos (ubicación solo para buscar por primera vez)'); notifyListeners(); return; } found.clear(); try { await _m.invokeMethod('startScan'); } catch (e) { logs.insert(0, 'No se pudo buscar: $e'); notifyListeners(); } }
   Future<void> stopScan() => _m.invokeMethod('stopScan');
-  Future<void> connect(String mac) async { await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }
-  Future<void> disconnect() => _m.invokeMethod('disconnect');
+  Future<void> connect(String mac) async { auto.userHold = false; await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }
+  Future<void> disconnect() { auto.userHold = true; return _m.invokeMethod('disconnect'); }
   Future<void> sync() => _m.invokeMethod('sync');
   Future<void> startSport(String t) { sportActive = true; notifyListeners(); return _m.invokeMethod('startSport', {'type': t}); }
   Future<void> readAutoMeasure() => _m.invokeMethod('readAutoMeasure');
   Future<void> setAutoMeasure(int type, bool on, {int? interval}) { autoMsg = null; return _m.invokeMethod('setAutoMeasure', {'type': type, 'on': on, 'interval': interval}); }
   Future<void> stopSport() { sportActive = false; notifyListeners(); return _m.invokeMethod('stopSport'); }
+  Future<void> openBatterySettings() async { try { await _m.invokeMethod('openBatterySettings'); } catch (_) {} }
   Future<void> findBand() => _m.invokeMethod('findBand');
   Future<void> forget() async { await _m.invokeMethod('forgetMac'); savedMac = null; notifyListeners(); }
 

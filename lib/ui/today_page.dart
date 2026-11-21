@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/analysis.dart';
+import '../data/auto_sync.dart';
 import '../data/repo.dart';
 import '../theme/tokens.dart';
 import 'charts.dart';
@@ -56,6 +57,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
         PopupMenuButton<String>(tooltip: 'Opciones del día', constraints: const BoxConstraints(minWidth: 48), icon: const Icon(Icons.more_vert), onSelected: (_) => confirmAndDelete(context, r, type: 'day', keys: [k], title: 'Borrar los datos de este día', what: 'Se borrarán pasos, pulso, SpO₂, variabilidad y temperatura del $k. El sueño y los ejercicios se borran por separado.'),
           itemBuilder: (_) => [PopupMenuItem(value: 'del', height: 48, child: Text('Borrar los datos de este día', style: TextStyle(color: c.danger)))]),
       ]),
+      Semantics(liveRegion: false, child: Text(r.syncing ? 'Sincronizando…' : syncAgoText(r.lastSync, r.clock()), style: VT.caption(c))),
       const SizedBox(height: Sp.x3),
       _ribbon(c, r, keys, k),
       const SizedBox(height: Sp.x3),

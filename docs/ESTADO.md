@@ -149,3 +149,5 @@ Guía de pruebas: `docs/equipo/informes/REVISION_004.md` §b y «Estado final v1
 - **DEV_008:** se pueden borrar noches, sesiones (una o varias) y los datos de un día, con tumbas para que la pulsera no los resucite y borrado opcional en Health Connect. Implementado con tests; no probado en el móvil. Ver `informes/DEV_008.md`.
 
 **Actualización 2026-11-21 (DEV_009):** ya hay noches reales guardadas en el móvil de pruebas y la pestaña Sueño muestra el hipnograma por minuto, tendencia 7/14/30 noches y métricas derivadas (ver informes/DEV_009.md). Lo anterior sobre «sleep.json vacío» queda superado; sigue sin probarse una noche nueva entregada por la pulsera.
+
+**Actualización 2026-11-21 (DEV_012):** sincronización automática (app abierta, app cerrada con pantalla encendida, y exportación a Health Connect sin interfaz) con interruptor, intervalo y «Solo con la pantalla encendida» en Ajustes → Sincronización. Tests de Dart y JVM en verde. Verificado en el Mi 9 lo que no necesita la pulsera (ver `informes/DEV_012.md`); todo lo que depende de la pulsera: implementado, no probado en hardware.

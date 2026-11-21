@@ -46,6 +46,7 @@ class MainActivity : FlutterFragmentActivity() {
         super.configureFlutterEngine(engine)
         BandClient.init(applicationContext)
         Agps.schedule(applicationContext)
+        try { SyncScheduler.apply(applicationContext, replace = false) } catch (_: Throwable) {}
         clearExport(null) // H2: no queda ninguna copia de una ejecucion anterior
         EventChannel(engine.dartExecutor.binaryMessenger, "vigor/events")
             .setStreamHandler(object : EventChannel.StreamHandler {
@@ -153,6 +154,18 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     "installApk" -> result.success(installApk(call.argument<String>("name")))
                     "isConnected" -> result.success(BandClient.connected)
+                    "syncInfo" -> result.success(SyncPrefs.info(applicationContext))
+                    "setAutoSync" -> {
+                        val e = SyncPrefs.p(applicationContext).edit()
+                        call.argument<Boolean>("enabled")?.let { e.putBoolean("enabled", it) }
+                        call.argument<Int>("minutes")?.let { e.putInt("minutes", SyncRules.safeInterval(it)) }
+                        call.argument<Boolean>("screenOnly")?.let { e.putBoolean("screenOnly", it) }
+                        call.argument<Boolean>("bgExport")?.let { e.putBoolean("bgExport", it) }
+                        e.apply(); SyncScheduler.apply(applicationContext, replace = true); result.success(SyncPrefs.info(applicationContext))
+                    }
+                    "clearExportDirty" -> { SyncPrefs.clearDirty(applicationContext); result.success(null) }
+                    "hasConnectPermission" -> result.success(Build.VERSION.SDK_INT < 31 || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)
+                    "openBatterySettings" -> result.success(try { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true } catch (_: Throwable) { false })
                     else -> result.notImplemented()
                 }
             } catch (e: Throwable) { result.error("SDK", e.message, null) }
@@ -240,6 +253,7 @@ class MainActivity : FlutterFragmentActivity() {
                         if (d.exists()) { n += d.walkBottomUp().count { it.isFile }; d.deleteRecursively() }
                     }
                     getSharedPreferences("agps", MODE_PRIVATE).edit().clear().apply()
+                    SyncPrefs.wipe(applicationContext)
                     n
                 }
             } catch (e: Throwable) { null }

@@ -247,11 +247,13 @@ object BandClient {
     }
 
     // ---------------- lecturas ----------------
+    /** Etapas de la sincronizacion en curso que vencieron su tiempo (una sincronizacion con tiempos agotados no cuenta como "correcta"). */
+    @Volatile private var stageTimeouts = 0
     private fun stage(name: String, timeoutMs: Long = 90000, body: (finish: () -> Unit) -> Unit, next: () -> Unit) {
         var done = false
         lateinit var to: Runnable
         val fin: () -> Unit = { main.post { if (!done) { done = true; main.removeCallbacks(to); next() } } }
-        to = Runnable { log("timeout en $name"); fin() }
+        to = Runnable { log("timeout en $name"); stageTimeouts++; fin() }
         main.postDelayed(to, timeoutMs)
         try { body(fin) } catch (e: Throwable) { log("error en $name: ${e.message}"); fin() }
     }
@@ -266,17 +268,27 @@ object BandClient {
         }, cb)
     }
 
-    fun syncAll(done: (() -> Unit)? = null) {
+    /** [keepHeadless]=true solo lo usa SyncWorker: la sesion abierta por el trabajo debe poder cerrarse al terminar. */
+    fun syncAll(keepHeadless: Boolean = false, done: (() -> Unit)? = null) {
         main.post {
             if (!connected || syncing) { done?.invoke(); return@post }
             stopHeartNow() // la sincronizacion y la medicion de pulso no se solapan
             // H1: comprobar 'wiping' y marcar 'syncing' bajo el mismo cerrojo que usa tryWipe.
             val blocked = synchronized(store) { if (store.wiping) true else { syncing = true; false } }
             if (blocked) { done?.invoke(); return@post }
-            weConnectedHeadless = false // el usuario (o la app) usa la sesion: el trabajo de fondo no debe cerrarla
-            syncing = true; val gen = ++syncGen; emit(mapOf("type" to "sync", "value" to "start"))
+            if (!keepHeadless) weConnectedHeadless = false // el usuario (o la app) usa la sesion: el trabajo de fondo no debe cerrarla
+            syncing = true; stageTimeouts = 0; val gen = ++syncGen; emit(mapOf("type" to "sync", "value" to "start"))
             val alive = { gen == syncGen && connected }
-            val end: () -> Unit = { if (gen == syncGen) { syncing = false; emit(mapOf("type" to "sync", "value" to "end")) }; done?.invoke(); Unit }
+            val end: () -> Unit = {
+                if (gen == syncGen) {
+                    // Correcta = la conexion aguanto hasta el final y ninguna etapa vencio su tiempo. Solo entonces cuenta como "ultima sincronizacion".
+                    val ok = connected && stageTimeouts == 0
+                    val at = System.currentTimeMillis()
+                    if (ok) SyncPrefs.markSynced(app, at, appOpen = listener != null)
+                    syncing = false; emit(mapOf("type" to "sync", "value" to "end", "ok" to ok, "at" to at))
+                }
+                done?.invoke(); Unit
+            }
             readBatteryThen {
                 if (!alive()) { done?.invoke(); return@readBatteryThen }
                 stage("pasos", 15000, { fin ->
@@ -325,7 +337,7 @@ object BandClient {
             override fun onOriginSpo2OriginListDataChange(l: MutableList<Spo2hOriginData>?) { storeList("spo2", l) }
             override fun onReadOriginProgressDetail(day: Int, date: String?, all: Int, cur: Int) {}
             override fun onReadOriginProgress(p: Float) { emit(mapOf("type" to "syncProgress", "value" to p.toDouble())) }
-            override fun onReadTimeout(p0: Int) { log("timeout lectura origen: $p0"); flushAsync(listOf("origin5", "half", "hrv", "spo2")) { fin() } }
+            override fun onReadTimeout(p0: Int) { log("timeout lectura origen: $p0"); stageTimeouts++; flushAsync(listOf("origin5", "half", "hrv", "spo2")) { fin() } }
             override fun onReadOriginComplete() { flushAsync(listOf("origin5", "half", "hrv", "spo2")) { fin() } }
         }, watchday)
     }

@@ -164,3 +164,7 @@ Leyenda: **código** = implementado; **test** = cubierto por test automático (s
 | 87 | P2 | iPhone: escribir las fases del sueño en Apple Salud (categorías de HealthKit); código sin compilar, sin Mac | Desarrollador | pendiente |
 | 88 | P1 | DEV_011: escritura por lotes en Health Connect (hasta 500 datos por llamada) para pasos, distancia, calorías, pulso, HRV, pulso en reposo, SpO₂ y temperatura; evita agotar la cuota por llamadas | Desarrollador | hecho; verificado en el Mi 9 (unos 5800 datos en una ronda sin error de cuota) |
 | 86 | P2 | Rangos de referencia por fase: solo si se verifica una fuente (Ohayon 2004 solo se vio en resumen, sin porcentajes) | Investigador | pendiente |
+| 89 | P1 | DEV_012-1: sincronización automática con la app abierta (conexión sola, al reanudar, periódica 15/30/60, reconexión con espera creciente, sin solapes) y «Sincronizado hace X» en Hoy/Ajustes | Desarrollador | hecho en código y tests; pulsera NO probada |
+| 90 | P1 | DEV_012-2: SyncWorker periódico con la app cerrada (solo pantalla encendida, batería no baja, sin reintentos) | Desarrollador | implementado, no probado en hardware con pulsera; programación y salida limpia sin pulsera verificadas en el Mi 9 |
+| 91 | P1 | DEV_012-3: exportación a Health Connect sin interfaz (FlutterEngine + punto de entrada Dart), activada de serie | Desarrollador | ver DEV_012 para lo verificado |
+| 92 | P1 | Probar con la pulsera real: sincronización en segundo plano con pantalla encendida, ahorro de batería MIUI, consumo | Usuario + QA | pendiente |

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../data/analysis.dart';
+import '../data/auto_sync.dart';
 import '../data/live_heart.dart';
 import '../data/repo.dart';
 import '../data/sports.dart';
@@ -23,6 +24,7 @@ class SettingsHome extends StatelessWidget {
     final items = <(IconData, String, String, Widget Function())>[
       (Icons.watch_outlined, 'Pulsera', 'VIGOR · $_conn${repo.battery != null ? ' · ${repo.battery}%' : ''}', () => DevicePage(repo)),
       (Icons.monitor_heart_outlined, 'Mediciones y cadencia', 'Medición automática de la pulsera, intervalos y batería', () => MeasurementsPage(repo)),
+      (Icons.sync_outlined, 'Sincronización', repo.autoOn ? 'Automática cada ${repo.autoMin} min · ${syncAgoText(repo.lastSync, repo.clock())}' : 'Desactivada · solo manual', () => SyncSettingsPage(repo)),
       (Icons.sports_score_outlined, 'Actividad y deportes', '${sportModes.length} modos · FCmáx y zonas', () => SportSettingsPage(repo)),
       (Icons.person_outline, 'Perfil', 'Edad ${repo.age} · meta ${repo.stepGoal} pasos', () => ProfilePage(repo)),
       (Icons.satellite_alt_outlined, 'Efemérides GPS', 'Ayuda al GPS de la pulsera, en segundo plano', () => AgpsPage(repo)),
@@ -72,7 +74,7 @@ class DevicePage extends StatelessWidget {
         ]),
         if (r.savedMac != null) Note('Pulsera guardada: ${maskMac(r.savedMac)}'),
         if (r.syncing) ...[const SizedBox(height: Sp.x3), LinearProgressIndicator(value: r.progress > 0 && r.progress < 1 ? r.progress : null), const Note('Sincronizando…')]
-        else if (r.lastSync != null) Note('Última sincronización: ${hm(r.lastSync!)}'),
+        else if (r.lastSync != null) Note('${syncAgoText(r.lastSync, r.clock())} (${hm(r.lastSync!)})'),
         const SizedBox(height: Sp.x3),
         Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
           if (!ok && r.savedMac != null) FilledButton(onPressed: r.connectSaved, child: const Text('Conectar')),
@@ -297,4 +299,45 @@ class _PrivacyPanelState extends State<PrivacyPanel> {
       if (repo.privacyMsg != null) Semantics(liveRegion: true, container: true, label: repo.privacyMsg, child: ExcludeSemantics(child: Padding(padding: const EdgeInsets.only(top: Sp.x2), child: Text(repo.privacyMsg!, style: VT.body(c))))),
     ]));
   });
+}
+
+
+/// Sincronización automática (DEV_012): interruptor, intervalo, pantalla encendida, estado y ajustes de batería.
+class SyncSettingsPage extends StatelessWidget {
+  final VigorRepo repo; const SyncSettingsPage(this.repo, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final c = VC.of(context); final r = repo; final ok = r.conn == 'connected';
+    return SettingsScaffold('Sincronización', [
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Sincronización automática', style: VT.heading(c)),
+          subtitle: Text(r.autoOn ? 'La pulsera se lee sola y los datos llegan a Health Connect (si lo activaste), con la app abierta o cerrada' : 'Desactivada: solo sincronizas tú. Apaga el temporizador, la reconexión y el trabajo en segundo plano', style: VT.caption(c)),
+          value: r.autoOn, onChanged: (v) => r.setAutoSync(enabled: v)),
+        if (r.autoOn) ...[
+          Text('Intervalo', style: VT.caption(c)), const SizedBox(height: Sp.x1),
+          Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [for (final v in kAutoSyncIntervals) ChoiceChip(label: Text('$v min'), selected: v == r.autoMin, onSelected: (_) => r.setAutoSync(minutes: v))]),
+          SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Solo con la pantalla encendida', style: VT.body(c)),
+            subtitle: Text('Con la pantalla apagada no se conecta por Bluetooth ni se envía nada: ahorra batería. Se pone al día poco después de encenderla.', style: VT.caption(c)),
+            value: r.screenOnly, onChanged: (v) => r.setAutoSync(screenOnlyOnly: v)),
+          SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Enviar a Health Connect sin abrir la app', style: VT.body(c)),
+            subtitle: Text(r.health.master ? 'Tras una sincronización en segundo plano, con la app cerrada. Si lo apagas, se envía al abrir Vigor.' : 'Health Connect está desactivado en «Salud y compartir»: no se envía nada.', style: VT.caption(c)),
+            value: r.bgExport, onChanged: (v) => r.setAutoSync(bgExportOn: v)),
+        ],
+      ])),
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(r.syncing ? 'Sincronizando…' : syncAgoText(r.lastSync, r.clock()), style: VT.heading(c)),
+        if (r.lastBg != null) Note('Última pasada en segundo plano: ${hm(r.lastBg!)} · ${r.bgResult}'),
+        const SizedBox(height: Sp.x2),
+        FilledButton.icon(onPressed: ok && !r.syncing ? r.sync : null, icon: const Icon(Icons.sync), label: const Text('Sincronizar ahora')),
+        if (!ok) const Note('Conecta la pulsera para sincronizar a mano.'),
+      ])),
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Ahorro de batería del móvil', style: VT.heading(c)),
+        const Note('En Xiaomi/MIUI y otras marcas el sistema puede cerrar o retrasar las tareas en segundo plano. Sin una excepción de batería para Vigor, la sincronización con la app cerrada puede retrasarse o no ocurrir. Vigor no la pide por su cuenta: si quieres, ábrela tú.'),
+        const SizedBox(height: Sp.x2),
+        OutlinedButton.icon(onPressed: r.openBatterySettings, icon: const Icon(Icons.battery_saver_outlined), label: const Text('Ajustes de batería')),
+      ])),
+      const Note('La sincronización en segundo plano está implementada pero no probada con la pulsera real. El sistema decide cuándo ejecutarla: el intervalo mínimo de Android es de 15 min y puede retrasarse.'),
+    ]);
+  }
 }
