@@ -61,7 +61,8 @@ void main() {
     bm.setMockMethodCallHandler(_mc, (c) async { calls.add(c); return c.method == 'getData' ? (c.arguments['kind'] == 'sleep' ? sample : '[]') : null; });
     final repo = VigorRepo(); await t.runAsync(repo.reload);
     await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.dark), home: MediaQuery(data: const MediaQueryData(size: Size(360, 740), textScaler: TextScaler.linear(2)), child: Scaffold(body: SleepPage(repo)))));
-    final b = find.byTooltip('Borrar la noche del 2026-11-20'); expect(b, findsOneWidget);
+    final b = find.byTooltip('Borrar la noche del 2026-11-20');
+    await t.scrollUntilVisible(b, 300, scrollable: find.byType(Scrollable).first); expect(b, findsOneWidget);
     expect(t.getSize(b).height, greaterThanOrEqualTo(48));
     await t.tap(b); await t.pumpAndSettle();
     expect(find.textContaining('no se puede deshacer'), findsOneWidget);

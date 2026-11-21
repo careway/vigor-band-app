@@ -70,3 +70,9 @@ Recomendado por las investigaciones y **sin constancia de implementación** en e
 
 ## DEV_007: qué se comparte con Health Connect / Apple Salud
 Criterio: solo se comparten métricas con base en este documento y límites escritos (pasos, pulso, SpO₂, sueño, ejercicio). Temperatura (sesgo ≈ ±1,5 °C) va desactivada de serie y marcada «aprox.». Glucosa y componentes sanguíneos estimados, estrés y MET no se comparten: no están validados (FDA, 21-02-2024, sobre glucosa sin pinchar). La tabla completa está en `docs/equipo/informes/DEV_007.md`.
+
+## Visualización del sueño (DEV_009)
+- Hipnograma por minuto con eje de hora de reloj y la FC bajo el mismo eje: patrón de Oura (hipnograma en intervalos de 5 min y gráfico de movimiento debajo; https://support.ouraring.com/hc/en-us/articles/4403155260307) y de la literatura de visualización de hipnogramas (https://zzz.bwh.harvard.edu/luna/vignettes/dataplots). Fitbit: línea de tiempo, mantener y arrastrar para leer etapas, Awake incluye latencia y despertares breves (https://support.google.com/fitbit/answer/14236712).
+- Decodificación de `sleepLine`: doc del SDK Veepoo (sección SleepData). Modo preciso (1 car = 1 min): 0 profundo, 1 ligero, 2 REM, 3 insomnio, 4 despierto; modo normal (1 car = 5 min): 0 ligero, 1 profundo, 2 despierto.
+- Precisión: los relojes de consumo sobreestiman el sueño ligero (Chinoy 2021, PMC8120339). No se muestran rangos de referencia por fase: Ohayon 2004 (https://pubmed.ncbi.nlm.nih.gov/15586779/) solo se consultó en resumen, sin porcentajes verificables.
+- No se pudo leer Garmin (403) ni Apple Salud; Sleep Cycle y AutoSleep no se consultaron.

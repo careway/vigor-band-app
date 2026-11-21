@@ -231,6 +231,7 @@ SessionDerived deriveSession(int seconds, int meters, int bandPaceSecKm) {
 }
 
 // ---- E6: decodificador de sleepLine (modo normal, documentado en api_en.md) ----
+// OJO: solo vale para el modo normal (accurateType != 1). El modo preciso (1 carácter = 1 min, 0 profundo/1 ligero/2 REM/3 insomnio/4 despierto) lo decodifica decodeStages() en sleep_stages.dart.
 /// Cada carácter = 5 min; 0 ligero, 1 profundo, 2 despierto. Cualquier otro carácter se ignora (no se inventa).
 ({int totalMin, int lightMin, int deepMin, int awakeMin}) decodeSleepLineNormal(String line) {
   var l = 0, d = 0, w = 0;

@@ -8,7 +8,9 @@ import 'health_sync.dart';
 import 'heart_meter.dart';
 import 'live_heart.dart';
 import 'updater.dart';
+import 'sleep_stages.dart';
 import 'sports.dart';
+export 'sleep_stages.dart';
 export 'analysis.dart' show Sample;
 
 class Day {
@@ -29,7 +31,15 @@ class Day {
 class Night {
   final String date; final int total, deep, light, wake;
   final DateTime? down, up;
-  Night(this.date, this.total, this.deep, this.light, this.wake, this.down, this.up);
+  /// Fases por minuto de `sleepLine` (null si la noche no la trae: se muestra solo con totales). [precise]: modo preciso (con REM).
+  final List<Stage>? stages; final bool precise;
+  /// Minutos hasta el primer sueño profundo según la pulsera (`firstDeepDuration`); 0 = sin dato.
+  final int firstDeep;
+  Night(this.date, this.total, this.deep, this.light, this.wake, this.down, this.up, {this.stages, this.precise = false, this.firstDeep = 0});
+  /// Siesta: sueño total < 180 min (regla propia, ver sleep_stages.dart).
+  bool get isNap => isNapMinutes(total);
+  /// Inicio del registro: sleepDown o, si falta, sleepUp menos la duración del hipnograma.
+  DateTime? get start { if (down != null) return down; if (up != null && stages != null) return up!.subtract(Duration(minutes: stages!.length)); return null; }
 }
 
 class Session {
@@ -307,8 +317,8 @@ class VigorRepo extends ChangeNotifier {
 
     nights = <Night>[];
     for (final o in sl) { try {
-      final date = (o['Date'] ?? o['date'] ?? '').toString();
-      final n = Night(date, _n(o['allSleepTime']).toInt(), _n(o['deepSleepTime']).toInt(), _n(o['lowSleepTime']).toInt(), _n(o['wakeCount']).toInt(), _t(o['sleepDown']), _t(o['sleepUp']));
+      final date = (o['Date'] ?? o['date'] ?? '').toString(); final precise = _n(o['accurateType']) == 1;
+      final n = Night(date, _n(o['allSleepTime']).toInt(), _n(o['deepSleepTime']).toInt(), _n(o['lowSleepTime']).toInt(), _n(o['wakeCount']).toInt(), _t(o['sleepDown']), _t(o['sleepUp']), stages: decodeStages(o['sleepLine'] is String ? o['sleepLine'] as String : null, precise: precise), precise: precise, firstDeep: _n(o['firstDeepDuration']).toInt());
       if (n.total > 0) nights.add(n);
     } catch (_) {} }
     nights.sort((a, b) => b.date.compareTo(a.date));

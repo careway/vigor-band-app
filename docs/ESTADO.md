@@ -147,3 +147,5 @@ Guía de pruebas: `docs/equipo/informes/REVISION_004.md` §b y «Estado final v1
 - **Sueño y Health Connect (informe del usuario):** no se ha podido determinar la causa sin el móvil; con la muestra real el código envía bien. Se añadió diagnóstico por categoría y «Reintentar sueño». Ver adenda de `DEV_007.md`.
 
 - **DEV_008:** se pueden borrar noches, sesiones (una o varias) y los datos de un día, con tumbas para que la pulsera no los resucite y borrado opcional en Health Connect. Implementado con tests; no probado en el móvil. Ver `informes/DEV_008.md`.
+
+**Actualización 2026-11-21 (DEV_009):** ya hay noches reales guardadas en el móvil de pruebas y la pestaña Sueño muestra el hipnograma por minuto, tendencia 7/14/30 noches y métricas derivadas (ver informes/DEV_009.md). Lo anterior sobre «sleep.json vacío» queda superado; sigue sin probarse una noche nueva entregada por la pulsera.
