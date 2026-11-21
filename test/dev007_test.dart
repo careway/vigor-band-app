@@ -18,6 +18,8 @@ class FakeGateway implements HealthGateway {
   @override Future<bool> requestPermissions(Set<HType> types) async { requests++; if (permit) granted.addAll(types); return permit; }
   @override String? get lastError => failWrites ? 'PlatformException: simulado' : null;
   @override Future<bool> write(HealthItem it) async { if (failWrites || failTypes.contains(it.type)) return false; items.add(it); onWrite?.call(it); return true; }
+  int batchCalls = 0;
+  @override Future<BatchOut> writeBatch(List<HealthItem> its) async { batchCalls++; var n = 0; for (final it in its) { if (!await write(it)) return BatchOut(n, 'simulado'); n++; } return BatchOut(n); }
   @override Future<String?> writeWorkout(WorkoutOut w) async { if (failWrites) return null; workouts.add(w); return 'w-${w.key}'; }
   @override Future<bool> writeRoute(String id, List<RoutePoint> pts) async { routes[id] = pts.length; return true; }
   @override Future<bool> deleteRange(HType t, DateTime a, DateTime b) async { deleted.add(t); return true; }
@@ -98,7 +100,8 @@ void main() {
     final e = Env(); await e.h.init({}); await e.h.setMaster(true);
     e.g.onWrite = (it) { if (it.type == HType.steps && e.g.items.where((i) => i.type == HType.steps).length == 1) { e.h.cats[HealthCat.activity] = false; } };
     await e.h.run();
-    expect(e.g.items.where((i) => i.type == HType.steps).length, 1);
+    // Con escritura por lotes, el lote en curso (los 3 datos de pasos) termina; los siguientes (distancia, calorías) ya no se envían.
+    expect(e.g.items.where((i) => i.type == HType.steps).length, 3);
     expect(e.g.items.where((i) => i.type == HType.distance), isEmpty);
     expect(e.g.items.where((i) => i.type == HType.heartRate), isNotEmpty); // otras categorías siguen
   });

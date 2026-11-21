@@ -122,6 +122,11 @@ class MainActivity : FlutterFragmentActivity() {
                         val raw = (call.argument<List<List<Number>>>("stages") ?: emptyList()).map { r -> r.map { it.toLong() } }
                         SleepStageWriter.write(applicationContext, id, ver, st, en, raw) { code -> android.util.Log.i("VIGORLOG", "writeSleepStages " + code); runOnUiThread { try { result.success(code) } catch (_: Throwable) {} } }
                     }
+                    "writeHealthBatch" -> {
+                        val type = call.argument<String>("type") ?: ""
+                        val raw = (call.argument<List<List<Any>>>("items") ?: emptyList())
+                        HealthBatchWriter.write(applicationContext, type, raw) { out -> android.util.Log.i("VIGORLOG", "writeHealthBatch " + type + " " + out["code"] + " " + out["written"] + "/" + raw.size); runOnUiThread { try { result.success(out) } catch (_: Throwable) {} } }
+                    }
                     "openHealthSettings" -> result.success(openHealthSettings())
                     "healthLoad" -> ioExec.execute {
                         val out = try { BandClient.store.healthState() } catch (e: Throwable) { null }

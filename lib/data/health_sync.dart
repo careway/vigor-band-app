@@ -69,6 +69,9 @@ class SleepStagesOut {
   }
 }
 
+/// Resultado de [HealthGateway.writeBatch]: [written] datos consumidos desde el principio de la lista; [error] si se cortó antes del final.
+class BatchOut { final int written; final String? error; const BatchOut(this.written, [this.error]); }
+
 class WorkoutOut {
   final String key, title; final int sportType; final DateTime start, end; final int meters, kcal;
   const WorkoutOut(this.key, this.title, this.sportType, this.start, this.end, this.meters, this.kcal);
@@ -86,6 +89,9 @@ abstract class HealthGateway {
   Future<bool> hasPermissions(Set<HType> types);
   Future<bool> requestPermissions(Set<HType> types);
   Future<bool> write(HealthItem it);
+  /// Escribe varios datos del MISMO tipo con pocas llamadas (la cuota de Health Connect cuenta llamadas, no registros).
+  /// Devuelve cuántos se consumieron desde el principio (escritos o descartados por inválidos) y la causa si se cortó.
+  Future<BatchOut> writeBatch(List<HealthItem> items);
   /// Causa corta (sin datos personales) del último fallo de escritura, o null.
   String? get lastError;
   /// Devuelve el identificador del ejercicio escrito (null si falló).
@@ -112,8 +118,8 @@ class HealthSource {
   const HealthSource(this.days, this.nights, this.sessions, this.resting);
 }
 
-/// Tope de escrituras densas por ronda (Health Connect limita las peticiones por hora).
-const kMaxDensePerRun = 400;
+/// Tope de datos densos por ronda. Con escritura por lotes (500 por llamada) son pocas llamadas; el tope evita rondas interminables.
+const kMaxDensePerRun = 5000;
 
 /// Se suma a la version de la noche cuando se envía con fases (debe ser mayor que cualquier version sin fases).
 const kStagedVersionOffset = 1000000000;
@@ -136,7 +142,7 @@ class HealthSync extends ChangeNotifier {
   final catError = <HealthCat, String>{}; final catLastOk = <HealthCat, String>{};
   /// Noches disponibles / válidas en el último envío (para distinguir «no hay noches» de «pendiente»).
   int nightsSeen = 0, nightsValid = 0; bool ranOnce = false;
-  void _fail(HealthCat c) { catError[c] = gateway.lastError ?? 'el sistema rechazó la escritura (sin detalle)'; }
+  void _fail(HealthCat c, [String? why]) { catError[c] = why ?? gateway.lastError ?? 'el sistema rechazó la escritura (sin detalle)'; }
   HealthAvail? avail;
   Map<String, dynamic> _ledger = _fresh();
   bool _ledgerLoaded = false;
@@ -363,19 +369,25 @@ class HealthSync extends ChangeNotifier {
         final wm = ((_ledger['wm'] as Map)[st.id] as num?)?.toInt();
         final floor = clock().subtract(const Duration(days: kDenseBackfillDays)).millisecondsSinceEpoch;
         final from = wm == null ? floor : (wm > floor ? wm : floor);
-        var n = 0;
+        final pending = <HealthItem>[];
         for (final it in st.items) {
           if (_cancel || !master || !effective(st.cat)) break; // desactivar detiene los envíos futuros inmediatamente
           if (it.start.millisecondsSinceEpoch <= from && (wm != null || it.start.millisecondsSinceEpoch < floor)) continue;
           if (wm != null && it.start.millisecondsSinceEpoch <= wm) continue;
-          bool ok; try { ok = await gateway.write(it); } catch (_) { ok = false; }
-          if (!ok) { errors++; _fail(st.cat); denseStop = true; break; } // cuota agotada u otro rechazo: no se insiste con el resto; no se avanza la marca: se reintenta en la siguiente sincronización
-          catLastOk[st.cat] = '${_dm(it.start)} ${_hm(it.start)}';
-          (_ledger['wm'] as Map)[st.id] = it.start.millisecondsSinceEpoch; _ledger['first'] ??= it.start.millisecondsSinceEpoch;
-          lastCount++; n++;
-          if (n % batch == 0) { await Future<void>.delayed(Duration.zero); }
-          if (++dense >= kMaxDensePerRun) { denseStop = true; break; } // tope por ronda; continúa en la siguiente
+          pending.add(it);
+          if (dense + pending.length >= kMaxDensePerRun) break; // tope por ronda; continúa en la siguiente
         }
+        if (pending.isEmpty) continue;
+        BatchOut r; try { r = await gateway.writeBatch(pending); } catch (_) { r = const BatchOut(0); }
+        if (r.written > 0) {
+          final lastIt = pending[r.written - 1];
+          catLastOk[st.cat] = '${_dm(lastIt.start)} ${_hm(lastIt.start)}';
+          (_ledger['wm'] as Map)[st.id] = lastIt.start.millisecondsSinceEpoch; _ledger['first'] ??= pending.first.start.millisecondsSinceEpoch;
+          lastCount += r.written; dense += r.written;
+        }
+        if (r.written < pending.length) { errors++; _fail(st.cat, r.error); denseStop = true; } // cuota agotada u otro rechazo: no se insiste; la marca queda donde se cortó y se reintenta en la siguiente sincronización
+        else if (dense >= kMaxDensePerRun) { denseStop = true; }
+        await Future<void>.delayed(Duration.zero);
       }
       ranOnce = true; totalSent += lastCount; _ledger['total'] = totalSent;
       if (lastCount > 0 || errors == 0) { last = clock(); _ledger['last'] = last!.millisecondsSinceEpoch; }

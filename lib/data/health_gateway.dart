@@ -98,6 +98,33 @@ class PlatformHealthGateway implements HealthGateway {
   }
 
   @override
+  Future<BatchOut> writeBatch(List<HealthItem> items) async {
+    if (items.isEmpty) return const BatchOut(0);
+    if (!isIos) {
+      // Android: hasta 500 datos por llamada a Health Connect (código Kotlin propio). El plugin haría una llamada por dato.
+      try {
+        final r = await _ch.invokeMapMethod<String, dynamic>('writeHealthBatch', {
+          'type': items.first.type.name,
+          'items': [for (final it in items) [it.id, it.version.round(), it.start.millisecondsSinceEpoch, it.end.millisecondsSinceEpoch, it.value]]});
+        final code = (r?['code'] as String?) ?? 'sin respuesta'; final n = (r?['written'] as num?)?.toInt() ?? 0;
+        if (code == 'OK') return BatchOut(n);
+        if (!code.startsWith('ERROR') && code != 'sin respuesta') {
+          return BatchOut(n, switch (code) {
+            'RATE_LIMIT' => 'Health Connect limitó las escrituras (cuota agotada); se continuará en la próxima sincronización',
+            'NO_PERMISSION' => 'falta el permiso de escritura en Health Connect',
+            'UNAVAILABLE' => 'Health Connect no está disponible',
+            _ => 'Health Connect: $code' });
+        }
+        _err = 'escritura por lotes no disponible ($code); se usa la vía lenta';
+      } catch (e) { _err = 'escritura por lotes no disponible (${_short(e)}); se usa la vía lenta'; }
+    }
+    // iPhone (HealthKit no tiene esta cuota) o fallo inesperado del escritor por lotes: una escritura por dato, como siempre.
+    var n = 0;
+    for (final it in items) { if (!await write(it)) return BatchOut(n, _err); n++; }
+    return BatchOut(n);
+  }
+
+  @override
   Future<String?> writeWorkout(WorkoutOut w) async {
     await _cfg();
     final id = await _h.writeWorkoutDataUUID(activityType: workoutTypeFor(w.sportType, ios: isIos), start: w.start, end: w.end,
