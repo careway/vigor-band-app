@@ -7,6 +7,12 @@ import com.veepoo.protocol.listener.base.IBleWriteResponse
 import com.veepoo.protocol.listener.data.IHrvDetectListener
 import com.veepoo.protocol.listener.data.IMetDetectListener
 import com.veepoo.protocol.listener.data.IPressureDetectListener
+import com.veepoo.protocol.listener.data.ISportControlOptListener
+import com.veepoo.protocol.listener.data.ISportModelStateListener
+import com.veepoo.protocol.model.datas.SportControlDataInfo
+import com.veepoo.protocol.model.datas.SportModelStateData
+import com.veepoo.protocol.model.enums.ESportControlType
+import com.veepoo.protocol.model.enums.ESportType
 import com.veepoo.protocol.listener.data.ISleepDataListener
 import com.veepoo.protocol.listener.data.ITemptureDetectDataListener
 import com.veepoo.protocol.model.datas.SleepData
@@ -155,6 +161,38 @@ object DebugTools {
     fun appendGps(j: JSONObject) {
         if (!BandClient.debuggable) return
         try { dumpDir().mkdirs(); val f = File(dumpDir(), "live_gps.jsonl"); if (f.length() > 2_000_000) return; f.appendText(JSONObject(j.toString()).put("t", System.currentTimeMillis()).toString() + "\n") } catch (_: Throwable) {}
+    }
+
+    /**
+     * Solo depuracion: comprueba que modos deportivos ACEPTA la pulsera. Para cada uno: lo inicia con startMultSportModel, a los 3 s lee su estado con
+     * readSportControlInfo y a los 5 s lo para; anota una linea por modo en files/debug/mode_probe.txt (sin datos personales). Una actividad de menos de
+     * 1 minuto no se guarda en la pulsera. Los modos van uno detras de otro (~8 s cada uno); si hay una actividad en curso, se cancela.
+     */
+    @Volatile var probing = false
+    fun probeModes(names: List<String>) {
+        if (!BandClient.debuggable || probing || !BandClient.connected) { log("sondeo de modos: no se puede (depuracion=${BandClient.debuggable}, ya en curso=$probing, conectada=${BandClient.connected})"); return }
+        probing = true; val out = StringBuilder(); var i = 0
+        fun note(l: String) { log("modo-$l"); out.append(l).append('\n'); try { dumpDir().mkdirs(); File(dumpDir(), "mode_probe.txt").writeText(out.toString()) } catch (_: Throwable) {} }
+        fun next() {
+            if (i >= names.size) { probing = false; note("FIN: ${names.size} modos probados"); return }
+            val name = names[i++]; val t = try { ESportType.valueOf(name) } catch (_: Throwable) { note("$name -> no existe en el SDK"); main.post { next() }; return }
+            var state = "sin respuesta"; var read = "sin lectura"
+            val sl = object : ISportModelStateListener {
+                override fun onSportModelStateChange(d: SportModelStateData) { state = "operacion=${d.oprateStauts} dispositivo=${d.deviceStauts} tipo=${d.sportModeType}" }
+                override fun onSportStopped() { }
+            }
+            try { mgr.startMultSportModel(noop, sl, t) } catch (e: Throwable) { note("$name -> error al iniciar: ${e.javaClass.simpleName}"); main.postDelayed({ next() }, 500); return }
+            main.postDelayed({
+                try { mgr.readSportControlInfo(noop, t, object : ISportControlOptListener {
+                    override fun onSportControlOptFail() { read = "lectura fallida" }
+                    override fun onSportControlOptSuccess() { }
+                    override fun onSportControlDataChange(d: SportControlDataInfo) { read = "estado=${d.runState} deporte_eco=${d.sportType} gps=${d.gpsSignal} gnss=${d.isGnssSport} dispositivo=${d.deviceState}" }
+                }) } catch (e: Throwable) { read = "error de lectura: ${e.javaClass.simpleName}" }
+            }, 3000)
+            main.postDelayed({ try { mgr.stopSportModel(noop, sl) } catch (_: Throwable) {} ; note("$name -> inicio: $state | $read") }, 5500)
+            main.postDelayed({ next() }, 8500)
+        }
+        note("INICIO del sondeo de ${names.size} modos"); next()
     }
 
     private var rawStarted = false
