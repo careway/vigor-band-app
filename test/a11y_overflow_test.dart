@@ -27,7 +27,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(const MethodChannel('vigor/methods'), (c) async => c.method == 'getData' ? jsonEncode([]) : null));
 
-  Future<void> pumpScaled(WidgetTester t, Widget page, double scale, {Size size = const Size(360, 780)}) async {
+  Future<void> pumpScaled(WidgetTester t, Widget page, double scale, {Size size = const Size(360, 1000)}) async {
     _other.clear(); final old = FlutterError.onError;
     FlutterError.onError = (d) { if (!d.exceptionAsString().contains('overflowed')) _other.add(d.exception); };
     addTearDown(() => FlutterError.onError = old);

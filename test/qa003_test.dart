@@ -29,7 +29,7 @@ void main() {
     final old = FlutterError.onError; // overflow por la fuente Ahem: no es evidencia
     FlutterError.onError = (d) { if (!d.exceptionAsString().contains('overflowed')) old!(d); };
     addTearDown(() => FlutterError.onError = old);
-    t.view.physicalSize = const Size(1080, 2400); t.view.devicePixelRatio = 3;
+    t.view.physicalSize = const Size(1080, 3300); t.view.devicePixelRatio = 3; // más alto: la leyenda del reloj alarga la pantalla
     addTearDown(t.view.resetPhysicalSize); addTearDown(t.view.resetDevicePixelRatio);
     await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.dark), builder: (c, x) => MediaQuery(data: MediaQuery.of(c).copyWith(disableAnimations: true), child: x!), home: Scaffold(body: w)));
     await t.pump(const Duration(seconds: 1));

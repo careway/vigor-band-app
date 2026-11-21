@@ -1,3 +1,4 @@
+import '../data/day_kinds.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,7 +159,9 @@ class GaugePainter extends CustomPainter {
 /// Reloj del día: anillo exterior = actividad por franjas de 30 min; anillo medio = pulso en polar.
 class DayDial extends StatefulWidget {
   final Day day; final VC c; final double? scrubMin; final double? nowMin; final ValueChanged<double?> onScrub; final ValueChanged<bool> onLock;
-  const DayDial({super.key, required this.day, required this.c, required this.scrubMin, required this.nowMin, required this.onScrub, required this.onLock});
+  /// Mezcla de cada franja de 30 min (48): sueño y esfuerzo. Si es null, el anillo se pinta solo por pasos, como antes.
+  final List<BinMix>? mix;
+  const DayDial({super.key, required this.day, required this.c, required this.scrubMin, required this.nowMin, required this.onScrub, required this.onLock, this.mix});
   @override
   State<DayDial> createState() => _DayDialState();
 }
@@ -209,14 +212,30 @@ class _DayDialState extends State<DayDial> {
           onPointerMove: (e) { if (_active) _hit(e.localPosition, size); },
           onPointerUp: (_) => _release(),
           onPointerCancel: (_) => _release(),
-          child: GestureDetector(onDoubleTap: () => widget.onScrub(null), child: CustomPaint(size: size, painter: _DialPainter(widget.day, widget.c, widget.scrubMin, widget.nowMin))),
+          child: GestureDetector(onDoubleTap: () => widget.onScrub(null), child: CustomPaint(size: size, painter: _DialPainter(widget.day, widget.c, widget.scrubMin, widget.nowMin, widget.mix))),
         );
       }));
 }
 
+/// Colores de referencia del reloj: dormir morado, reposo azul, actividad leve verde, actividad deportiva naranja.
+Color dayKindColor(VC c, DayKind k) => switch (k) {
+      DayKind.sleep => c.accent2, DayKind.activity => c.met, DayKind.walk => c.steps, DayKind.rest => c.spo2, DayKind.none => c.surfaceHi };
+
+/// Degradado del esfuerzo: 0 azul (reposo) → 0,5 verde (actividad leve) → 1 naranja (deportiva).
+Color effortColor(VC c, double effort) {
+  final e = effort.clamp(0.0, 1.0);
+  return e <= .5 ? Color.lerp(c.spo2, c.steps, e / .5)! : Color.lerp(c.steps, c.met, (e - .5) / .5)!;
+}
+
+/// Color de una franja: el degradado del esfuerzo, con el sueño por encima (a partir de 15 min de sueño, morado del todo). Sin datos: gris.
+Color mixColor(VC c, BinMix m) {
+  if (!m.hasData) return c.surfaceHi.withValues(alpha: .7);
+  return Color.lerp(effortColor(c, m.effort), c.accent2, m.sleep)!;
+}
+
 class _DialPainter extends CustomPainter {
-  final Day day; final VC c; final double? scrub, now;
-  _DialPainter(this.day, this.c, this.scrub, this.now);
+  final Day day; final VC c; final double? scrub, now; final List<BinMix>? mix;
+  _DialPainter(this.day, this.c, this.scrub, this.now, this.mix);
   double ang(double m) => -math.pi / 2 + 2 * math.pi * m / 1440;
   @override
   void paint(Canvas canvas, Size s) {
@@ -228,7 +247,8 @@ class _DialPainter extends CustomPainter {
     final ring = Rect.fromCircle(center: ctr, radius: R - 8);
     for (var i = 0; i < 48; i++) {
       final k = mx > 0 ? bins[i] / mx : 0.0;
-      final p = Paint()..style = PaintingStyle.stroke..strokeWidth = 14..strokeCap = StrokeCap.butt..color = k > 0 ? c.steps.withValues(alpha: .22 + .78 * k) : c.surfaceHi.withValues(alpha: .7);
+      final Color col = mix == null ? (k > 0 ? c.steps.withValues(alpha: .22 + .78 * k) : c.surfaceHi.withValues(alpha: .7)) : mixColor(c, mix![i]);
+      final p = Paint()..style = PaintingStyle.stroke..strokeWidth = 14..strokeCap = StrokeCap.butt..color = col;
       canvas.drawArc(ring, ang(i * 30.0) + .012, 2 * math.pi / 48 - .024, false, p);
     }
     // 2) pulso en polar
@@ -263,5 +283,5 @@ class _DialPainter extends CustomPainter {
     }
   }
   @override
-  bool shouldRepaint(_DialPainter o) => o.scrub != scrub || o.day != day || o.now != now || o.c != c;
+  bool shouldRepaint(_DialPainter o) => o.scrub != scrub || o.day != day || o.now != now || o.c != c || o.mix != mix;
 }

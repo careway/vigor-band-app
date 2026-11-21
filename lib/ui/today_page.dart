@@ -1,3 +1,5 @@
+import '../data/day_kinds.dart';
+import 'day_kind_legend.dart';
 import 'package:flutter/material.dart';
 import '../data/analysis.dart';
 import '../data/auto_sync.dart';
@@ -133,9 +135,11 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
   }
 
   Widget _dialCard(VC c, VigorRepo r, Day d, double steps, bool isToday) {
+    final mix = mixDay(day: d, nights: r.nights, sessions: r.sessions, hrMax: hrMaxTanaka(r.age));
+    final kinds = [for (final m in mix) m.kind];
     return Glass(glow: c.accent, padding: const EdgeInsets.all(Sp.x4), child: Column(children: [
       Stack(alignment: Alignment.center, children: [
-        ValueListenableBuilder<double?>(valueListenable: scrub, builder: (_, m, _) => DayDial(day: d, c: c, scrubMin: m, nowMin: isToday ? minutesOf(DateTime.now()) : null, onScrub: (v) => scrub.value = v, onLock: (v) { if (v != lock) setState(() => lock = v); })),
+        ValueListenableBuilder<double?>(valueListenable: scrub, builder: (_, m, _) => DayDial(day: d, c: c, scrubMin: m, nowMin: isToday ? minutesOf(DateTime.now()) : null, onScrub: (v) => scrub.value = v, mix: mix, onLock: (v) { if (v != lock) setState(() => lock = v); })),
         Column(mainAxisSize: MainAxisSize.min, children: [
           IgnorePointer(child: Semantics(container: true, label: 'Pasos: ${steps.round()} de ${r.stepGoal}', child: ExcludeSemantics(child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('PASOS', style: VT.caption(c).copyWith(letterSpacing: 1.6, fontWeight: FontWeight.w700)),
@@ -147,9 +151,11 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
         ]),
       ]),
       const SizedBox(height: Sp.x2),
+      DayKindLegend(kinds),
+      const SizedBox(height: Sp.x2),
       ValueListenableBuilder<double?>(valueListenable: scrub, builder: (_, m, _) => m == null
           ? Text('Toca y arrastra por los anillos para ver tu día minuto a minuto · doble toque para soltar', textAlign: TextAlign.center, style: VT.caption(c))
-          : _readout(c, d, m)),
+          : _readout(c, d, m, kinds)),
       TextButton.icon(onPressed: () => _slots(c, d), icon: const Icon(Icons.view_list_outlined, size: 18), label: const Text('Ver datos del día por franjas')),
     ]));
   }
@@ -171,7 +177,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
     ])));
   }
 
-  Widget _readout(VC c, Day d, double m) {
+  Widget _readout(VC c, Day d, double m, List<DayKind> kinds) {
     final h = m ~/ 60, mi = (m % 60).round();
     Widget chip(MetricSpec s, List<Sample> l, double within) {
       final e = nearest(l, m, within: within); final col = s.color(c);
@@ -181,7 +187,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
     }
     final bin = d.steps5.where((e) => e.t.hour * 2 + e.t.minute ~/ 30 == m ~/ 30).fold<double>(0, (a, e) => a + e.v);
     return Column(children: [
-      Semantics(liveRegion: true, child: Text('${two(h)}:${two(mi)}', style: VT.heading(c))), const SizedBox(height: Sp.x2),
+      Semantics(liveRegion: true, child: Text('${two(h)}:${two(mi)} · ${dayKindLabel(kinds[(m ~/ 30).clamp(0, 47)])}', style: VT.heading(c))), const SizedBox(height: Sp.x2),
       Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [
         chip(kHr, d.hr, 6), chip(kSpo2, d.spo2, 8), chip(kHrv, d.hrv, 8), chip(kStress, d.stress, 20), chip(kMet, d.met, 8), chip(kTemp, d.temp, 20),
         Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: c.steps.withValues(alpha: .16)),

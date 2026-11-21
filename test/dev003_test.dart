@@ -37,7 +37,7 @@ void main() {
     final r = VigorRepo(); if (now != null) r.clock = () => now; await r.reload(); return r;
   }
   final other = <Object>[];
-  Future<void> pump(WidgetTester t, Widget w, {double scale = 1.0, Size size = const Size(360, 780), Brightness b = Brightness.dark}) async {
+  Future<void> pump(WidgetTester t, Widget w, {double scale = 1.0, Size size = const Size(360, 1000), Brightness b = Brightness.dark}) async {
     other.clear(); final old = FlutterError.onError;
     FlutterError.onError = (d) { if (!d.exceptionAsString().contains('overflowed')) other.add(d.exception); };
     addTearDown(() => FlutterError.onError = old);

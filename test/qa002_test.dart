@@ -123,7 +123,7 @@ void main() {
       for (final v in [60.0, 80.0, 100.0]) { d.hr.add(Sample(DateTime(2026, 3, 5, 8, v.toInt() % 60), v)); }
       r.days = {d.date: d}; r.conn = 'connected';
       bm.setMockMethodCallHandler(_mc, (c) async => '[]');
-      t.view.physicalSize = const Size(1080, 2400); t.view.devicePixelRatio = 3;
+      t.view.physicalSize = const Size(1080, 3300); t.view.devicePixelRatio = 3; // más alto: la leyenda del reloj alarga la pantalla
       addTearDown(t.view.resetPhysicalSize); addTearDown(t.view.resetDevicePixelRatio);
       await t.pumpWidget(MaterialApp(theme: buildTheme(Brightness.dark), builder: (c, w) => MediaQuery(data: MediaQuery.of(c).copyWith(disableAnimations: true), child: w!), home: Scaffold(body: TodayPage(r))));
       await t.pump(const Duration(seconds: 1));
