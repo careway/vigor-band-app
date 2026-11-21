@@ -42,6 +42,8 @@ La dirección contraria (móvil → pulsera) también existe: `startFindDeviceBy
 4. Mostrar en la app las actividades iniciadas desde la pulsera en cuanto llegue el aviso.
 Cada una necesita probarse con la pulsera en la mano.
 
+> Nota: la VIGOR **no tiene pantalla**. Donde esta investigación hable de «menú» o «pantalla» de la pulsera (p. ej. «cámara», «música» o «buscar móvil» en su menú), no aplica: los eventos solo podrían salir de botones físicos o gestos.
+
 ## Adenda: prueba real con la VIGOR vinculada (2026-11-21)
 **Cómo:** una sonda SOLO de depuración (`src/debug/.../EventProbe.kt`, no existe en release) registra todos los oyentes del SDK (buscar móvil, golpecito, SOS, llamadas, música, control de deporte, estado de deporte, cámara) y escribe «EVENTO …» en el registro; se grabó el registro completo durante 150 s mientras el usuario pulsaba botones, daba golpecitos y levantaba la muñeca. Para el modo foto hay un disparador de depuración (`am broadcast … --es probe camera`).
 
@@ -55,7 +57,7 @@ Cada una necesita probarse con la pulsera en la mano.
   - `bt_operate` `BD 03 01 00 02 00 01 01` (1, 19:10:54): evento de Bluetooth/estado, sin identificar.
 - No se vio ningún paquete distinto para pulsaciones de botón, golpecito ni levantar la muñeca.
 
-**Conclusión provisional:** con esta pulsera y este SDK, los botones físicos y los gestos **no generan eventos que la app pueda escuchar**, salvo la acción «buscar móvil» del menú de la pulsera, que llega como paquete pero sin pasar por el oyente del SDK. Aprovecharla exigiría interpretar el paquete en bruto, que el SDK no expone (habría que enganchar la notificación de la característica `0xf0080002`, no probado).
+**Conclusión provisional:** con esta pulsera y este SDK, los botones físicos y los gestos **no generan eventos que la app pueda escuchar**, salvo una acción de «buscar el móvil» (`find_phone_by_watch`), que llegó como paquete pero sin pasar por el oyente del SDK. **La VIGOR no tiene pantalla**, así que esa acción no sale de un menú: lo más probable es que la dispare un botón físico o un gesto durante la prueba, pero no se identificó cuál (y el usuario no lo recordó). Aprovecharla exigiría interpretar el paquete en bruto, que el SDK no expone (habría que enganchar la notificación de la característica `0xf0080002`, no probado).
 
 **Pendiente:** el modo foto (obturador) no se pudo probar en esta ronda; la reconexión y la identificación exacta de qué acción hizo el usuario en cada momento.
 
