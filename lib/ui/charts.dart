@@ -217,20 +217,32 @@ class _DayDialState extends State<DayDial> {
       }));
 }
 
+/// Paleta del anillo del reloj. En el tema oscuro, los colores de siempre; en el claro, tonos más claros y vivos, cercanos a los del oscuro
+/// (un 25 % hacia el tono oscuro-sobre-claro del tema, para que no se pierdan sobre fondo blanco). Es un elemento gráfico y no lleva texto:
+/// cada color va siempre acompañado de su nombre en la leyenda.
+class RingPalette {
+  final Color rest, light, sport, sleep;
+  const RingPalette(this.rest, this.light, this.sport, this.sleep);
+  static Color _soft(Color dark, Color light) => Color.lerp(dark, light, .25)!;
+  static RingPalette of(VC c) => identical(c, VC.light)
+      ? RingPalette(_soft(VC.dark.spo2, VC.light.spo2), _soft(VC.dark.steps, VC.light.steps), _soft(VC.dark.met, VC.light.met), _soft(VC.dark.accent2, VC.light.accent2))
+      : RingPalette(c.spo2, c.steps, c.met, c.accent2);
+}
+
 /// Colores de referencia del reloj: dormir morado, reposo azul, actividad leve verde, actividad deportiva naranja.
-Color dayKindColor(VC c, DayKind k) => switch (k) {
-      DayKind.sleep => c.accent2, DayKind.activity => c.met, DayKind.walk => c.steps, DayKind.rest => c.spo2, DayKind.none => c.surfaceHi };
+Color dayKindColor(VC c, DayKind k) { final p = RingPalette.of(c); return switch (k) {
+      DayKind.sleep => p.sleep, DayKind.activity => p.sport, DayKind.walk => p.light, DayKind.rest => p.rest, DayKind.none => c.surfaceHi }; }
 
 /// Degradado del esfuerzo: 0 azul (reposo) → 0,5 verde (actividad leve) → 1 naranja (deportiva).
 Color effortColor(VC c, double effort) {
-  final e = effort.clamp(0.0, 1.0);
-  return e <= .5 ? Color.lerp(c.spo2, c.steps, e / .5)! : Color.lerp(c.steps, c.met, (e - .5) / .5)!;
+  final e = effort.clamp(0.0, 1.0); final p = RingPalette.of(c);
+  return e <= .5 ? Color.lerp(p.rest, p.light, e / .5)! : Color.lerp(p.light, p.sport, (e - .5) / .5)!;
 }
 
 /// Color de una franja: el degradado del esfuerzo, con el sueño por encima (a partir de 15 min de sueño, morado del todo). Sin datos: gris.
 Color mixColor(VC c, BinMix m) {
   if (!m.hasData) return c.surfaceHi.withValues(alpha: .7);
-  return Color.lerp(effortColor(c, m.effort), c.accent2, m.sleep)!;
+  return Color.lerp(effortColor(c, m.effort), RingPalette.of(c).sleep, m.sleep)!;
 }
 
 class _DialPainter extends CustomPainter {

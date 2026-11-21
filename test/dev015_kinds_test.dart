@@ -80,23 +80,29 @@ void main() {
   });
 
   group('degradado de color', () {
-    test('en los extremos: reposo azul, actividad leve verde, deportiva naranja (claro y oscuro)', () {
-      for (final c in [VC.dark, VC.light]) {
-        expect(effortColor(c, 0), c.spo2); expect(effortColor(c, .5), c.steps); expect(effortColor(c, 1), c.met);
-        expect(dayKindColor(c, DayKind.sleep), c.accent2);
+    test('en los extremos: reposo azul, actividad leve verde, deportiva naranja y sueño morado; en oscuro, los tokens de siempre', () {
+      final c = VC.dark;
+      expect(effortColor(c, 0), c.spo2); expect(effortColor(c, .5), c.steps); expect(effortColor(c, 1), c.met); expect(dayKindColor(c, DayKind.sleep), c.accent2);
+    });
+    test('tema claro: tonos más claros que los del tema, más cerca de los del oscuro, sin perder el matiz', () {
+      double lum(Color x) => 0.2126 * x.r + 0.7152 * x.g + 0.0722 * x.b;
+      final l = VC.light, d = VC.dark, p = RingPalette.of(l);
+      for (final (a, b, o) in [(p.rest, l.spo2, d.spo2), (p.light, l.steps, d.steps), (p.sport, l.met, d.met), (p.sleep, l.accent2, d.accent2)]) {
+        expect(lum(a), greaterThan(lum(b)), reason: 'más claro que el token claro'); expect(lum(a), lessThan(lum(o)) , reason: 'sin llegar al del oscuro (se perdería sobre blanco)');
       }
+      expect(effortColor(l, 0), p.rest); expect(effortColor(l, .5), p.light); expect(effortColor(l, 1), p.sport); expect(dayKindColor(l, DayKind.sleep), p.sleep);
     });
     test('entre medias mezcla: más esfuerzo se parece más al siguiente color', () {
-      final c = VC.light; final a = effortColor(c, .1), b = effortColor(c, .4);
-      expect((b.g - c.steps.g).abs(), lessThan((a.g - c.steps.g).abs() + 1e-9), reason: '.4 está más cerca del verde que .1');
+      final c = VC.light; final a = effortColor(c, .1), b = effortColor(c, .4); final g = RingPalette.of(c).light;
+      expect((b.g - g.g).abs(), lessThan((a.g - g.g).abs() + 1e-9), reason: '.4 está más cerca del verde que .1');
       expect(effortColor(c, -3), effortColor(c, 0)); expect(effortColor(c, 7), effortColor(c, 1), reason: 'se acota a 0..1');
     });
     test('el sueño manda: con peso 1 la franja es morada sea cual sea el esfuerzo; con 0 conserva el degradado; sin datos, gris', () {
       final c = VC.light;
-      expect(mixColor(c, const BinMix(hasData: true, effort: 1, sleep: 1)), c.accent2);
+      expect(mixColor(c, const BinMix(hasData: true, effort: 1, sleep: 1)), RingPalette.of(c).sleep);
       expect(mixColor(c, BinMix(hasData: true, effort: .5, sleep: 0)), effortColor(c, .5));
       expect(mixColor(c, const BinMix()), c.surfaceHi.withValues(alpha: .7));
-      final mid = mixColor(c, const BinMix(hasData: true, effort: 1, sleep: .5)); expect(mid, isNot(c.accent2)); expect(mid, isNot(c.met));
+      final mid = mixColor(c, const BinMix(hasData: true, effort: 1, sleep: .5)); expect(mid, isNot(RingPalette.of(c).sleep)); expect(mid, isNot(RingPalette.of(c).sport));
     });
   });
 
