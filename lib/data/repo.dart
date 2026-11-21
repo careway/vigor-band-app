@@ -244,6 +244,7 @@ class VigorRepo extends ChangeNotifier {
         }
       case 'syncProgress': final pv = m['value']; if (pv is num) progress = pv.toDouble();
       case 'sportLive': { final d = m['data']; if (d is Map) workout.onReport(d); }
+      case 'gpsLive': { final d = m['data']; if (d is Map) workout.onGpsPoint(d); }
       case 'sport': sportMsgs.insert(0, '${m['msg']}'); if ('${m['msg']}' == 'Actividad detenida') { sportActive = false; workout.end(); }
       case 'autoMeasure':
         autoUnsupported = m['unsupported'] == true;

@@ -151,5 +151,33 @@ object DebugTools {
         try { dumpDir().mkdirs(); val f = File(dumpDir(), "live_reports.jsonl"); if (f.length() > 2_000_000) return; f.appendText(JSONObject(j.toString()).put("t", System.currentTimeMillis()).toString() + "\n") } catch (_: Throwable) {}
     }
 
+    /** Solo depuracion: guarda cada paquete de posicion en directo (CON coordenadas; fichero privado del movil) para decodificar su escala a mano. */
+    fun appendGps(j: JSONObject) {
+        if (!BandClient.debuggable) return
+        try { dumpDir().mkdirs(); val f = File(dumpDir(), "live_gps.jsonl"); if (f.length() > 2_000_000) return; f.appendText(JSONObject(j.toString()).put("t", System.currentTimeMillis()).toString() + "\n") } catch (_: Throwable) {}
+    }
+
+    private var rawStarted = false
+    /**
+     * Solo depuracion: cada 8 s lee el registro de la propia app (permitido: es de su mismo proceso) y guarda en files/debug/raw_packets.txt los paquetes
+     * `gps_lat_lon_oprate` y `sport_model_control_oprate` que la pulsera manda, tal cual (con hora). Sirve para decodificar a mano el flujo de posicion al aire libre
+     * sin tener el movil conectado al PC. El fichero puede contener coordenadas: es privado de la app y solo se lee por ADB.
+     */
+    fun startRawCapture() {
+        if (!BandClient.debuggable || rawStarted) return; rawStarted = true
+        Thread {
+            var lastTs = ""
+            while (true) {
+                try {
+                    Thread.sleep(8000)
+                    val p = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "time", "-s", "vepo-bluetooth:I"))
+                    val out = p.inputStream.bufferedReader().readLines().filter { (it.contains("onNotify,operate=gps_lat_lon_oprate") || it.contains("onNotify,operate=sport_model_control_oprate")) && it.length > 18 && it.substring(0, 18) > lastTs }
+                    p.destroy()
+                    if (out.isNotEmpty()) { lastTs = out.last().substring(0, 18); dumpDir().mkdirs(); val f = File(dumpDir(), "raw_packets.txt"); if (f.length() < 2_000_000) f.appendText(out.joinToString("\n") + "\n") }
+                } catch (_: Throwable) {}
+            }
+        }.apply { isDaemon = true; start() }
+    }
+
     fun clearDumps(): Int { var n = 0; dumpDir().listFiles()?.forEach { if (it.delete()) n++ }; return n }
 }

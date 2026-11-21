@@ -10,6 +10,8 @@ import 'package:vigor_app/ui/workout_ui.dart';
 
 const _mc = MethodChannel('vigor/methods');
 // Informes sintéticos con la forma del SDK (SportControlDataInfo) y sus unidades documentadas: calorías en calorías y velocidad en m/h.
+// Informe con la forma REAL que llegó de la pulsera (nombres, no números): ver `deporte-vivo` en el registro.
+Map<String, Object?> _real({String run = 'RUNNING', String op = 'START', String gps = 'GOOD', int hr = 120, int dur = 60}) => {'calories': 0, 'con': 3, 'deviceState': 'NORMAL', 'distance': 0, 'gpsSignal': gps, 'heartRate': hr, 'isGnssSport': true, 'opCode': op, 'pace': 0, 'runState': run, 'speed': 0, 'sportDuration': dur, 'sportType': 'OUTDOOR_WALK'};
 Map<String, Object?> _rep({Object? hr = 140, Object? dist = 1200, Object? pace = 330, Object? dur = 600, String run = 'RUNNING', Object? type = 1, Object? gps = 2, Object? kcal = 80000, Object? speed = 11500}) =>
     {'heartRate': hr, 'distance': dist, 'pace': pace, 'sportDuration': dur, 'runState': run, 'sportType': type, 'gpsSignal': gps, 'calories': kcal, 'speed': speed};
 
@@ -40,12 +42,51 @@ void main() {
       expect(ok.kcal, closeTo(80, 1e-9), reason: 'el SDK da calorías (no kcal): 80000 cal = 80 kcal'); expect(ok.speedKmh, closeTo(11.5, 1e-9), reason: 'el SDK da m/h: 11500 m/h = 11,5 km/h');
     });
     test('estado: pausa y fin por el texto del estado', () {
-      expect(WorkoutReport.parse(_rep(run: 'PAUSED')).isPaused, true); expect(WorkoutReport.parse(_rep(run: 'FINISHED')).isEnded, true); expect(WorkoutReport.parse(_rep(run: 'NOT_STARTED')).isEnded, false); expect(WorkoutReport.parse(_rep(run: 'RESUMING')).isPaused, false); expect(WorkoutReport.parse(_rep(run: 'RUNNING')).isEnded, false);
+      expect(WorkoutReport.parse(_rep(run: 'PAUSED')).isPaused, true); expect(WorkoutReport.parse(_rep(run: 'FINISHED')).isEnded, true); expect(WorkoutReport.parse({'opCode': 'STOP'}).isEnded, true); expect(WorkoutReport.parse(_rep(run: 'NOT_STARTED')).isEnded, false); expect(WorkoutReport.parse(_rep(run: 'RESUMING')).isPaused, false); expect(WorkoutReport.parse(_rep(run: 'RUNNING')).isEnded, false);
       expect(WorkoutReport.parse({}).heartRate, isNull);
     });
     test('texto del cronómetro y del ritmo', () {
       expect(clockText(const Duration(seconds: 65)), '01:05'); expect(clockText(const Duration(hours: 1, minutes: 2, seconds: 3)), '1:02:03'); expect(clockText(Duration.zero), '00:00');
       expect(paceText(330), '5:30'); expect(paceText(359.6), '6:00'); expect(paceText(null), '—'); expect(paceText(0), '—');
+    });
+  });
+
+  group('forma real del informe de la pulsera (nombres en lugar de números)', () {
+    test('el tipo de deporte y la señal GPS llegan por su nombre y se entienden', () {
+      final r = WorkoutReport.parse(_real()); expect(r.sportType, sportByKey('OUTDOOR_WALK')!.id); expect(r.gpsSignal, 3); expect(r.heartRate, 120); expect(r.durationSec, 60); expect(r.isRunning, true);
+      for (final (n, v) in [('NONE', 0), ('WEAK', 1), ('NORMAL', 2), ('GOOD', 3), ('STRONG', 4)]) { expect(WorkoutReport.parse(_real(gps: n)).gpsSignal, v, reason: n); }
+      expect(WorkoutReport.parse({'gpsSignal': 'raro'}).gpsSignal, isNull); expect(WorkoutReport.parse({'sportType': 'NO_EXISTE'}).sportType, isNull);
+    });
+    test('el eco de parar (opCode STOP, estado NOT_STARTED) termina la actividad y no la vuelve a activar', () {
+      final w = LiveWorkout(clock: () => DateTime(2026, 3, 5, 10)); w.onReport(_real()); expect(w.active, true);
+      w.onReport(_real(run: 'NOT_STARTED', op: 'STOP', gps: 'NONE')); expect(w.active, false);
+      w.onReport(_real(run: 'NOT_STARTED', op: 'START', gps: 'NONE')); expect(w.active, false, reason: 'una respuesta tardía de «no iniciada» no activa nada');
+    });
+    test('una respuesta de «no iniciada» mientras se espera el arranque no termina la actividad que inició la app', () {
+      final w = LiveWorkout(clock: () => DateTime(2026, 3, 5, 10)); w.begin(sportByKey('OUTDOOR_WALK')); w.onReport(_real(run: 'NOT_STARTED', op: 'START', gps: 'NONE')); expect(w.active, true);
+    });
+    test('el pulso y la duración del informe real alimentan el entreno', () {
+      final w = LiveWorkout(clock: () => DateTime(2026, 3, 5, 10)); w.begin(sportByKey('OUTDOOR_WALK')); w.onReport(_real(hr: 98, dur: 289)); expect(w.heartRate, 98); expect(w.elapsed().inSeconds, 289); expect(w.gpsSignal, 3);
+    });
+  });
+
+  group('posición en directo de la pulsera', () {
+    test('decodifica grados tal cual y, si son enteros grandes, prueba la escala (÷1e5, ÷1e6, ÷1e7)', () {
+      expect(parseLivePosition({'lat': 40.4168, 'lon': -3.7038}), (40.4168, -3.7038));
+      final a = parseLivePosition({'lat': 4041680, 'lon': -370380})!; expect(a.$1, closeTo(40.4168, 1e-9)); expect(a.$2, closeTo(-3.7038, 1e-9));
+      final b = parseLivePosition({'lat': 40416800, 'lon': -3703800})!; expect(b.$1, closeTo(40.4168, 1e-9)); expect(b.$2, closeTo(-3.7038, 1e-9));
+    });
+    test('un paquete vacío, 0,0, NaN o texto no es una posición', () {
+      for (final d in [<String, Object?>{}, {'lat': 0, 'lon': 0}, {'lat': double.nan, 'lon': 1.0}, {'lat': 'x', 'lon': 'y'}, {'lat': 999999999999, 'lon': 999999999999}, {'isOpen': true}]) { expect(parseLivePosition(d), isNull, reason: '$d'); }
+    });
+    test('los puntos en directo van formando el recorrido y la posición, con incertidumbre', () {
+      var now = DateTime(2026, 3, 5, 10); final w = LiveWorkout(clock: () => now)..begin(sportByKey('OUTDOOR_WALK'));
+      for (var i = 0; i < 8; i++) { now = now.add(const Duration(seconds: 5)); w.onGpsPoint({'lat': 40.0, 'lon': -3.0 + i * 0.00005}); }
+      expect(w.track.length, 8); expect(w.position, isNotNull); expect(w.uncertaintyM, isNotNull); expect(w.positionAgeSec, 0);
+    });
+    test('sin actividad en curso o con paquetes vacíos no se acumula nada', () {
+      final w = LiveWorkout(clock: () => DateTime(2026, 3, 5, 10)); w.onGpsPoint({'lat': 40.0, 'lon': -3.0}); expect(w.track, isEmpty);
+      w.begin(sportByKey('OUTDOOR_WALK')); w.onGpsPoint({'lat': 0, 'lon': 0}); expect(w.track, isEmpty); expect(w.position, isNull);
     });
   });
 

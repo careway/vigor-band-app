@@ -27,6 +27,9 @@ import com.veepoo.protocol.listener.data.IPwdDataListener
 import com.veepoo.protocol.listener.data.ISocialMsgDataListener
 import com.veepoo.protocol.listener.data.ISportModelOriginListener
 import com.veepoo.protocol.listener.data.IDeviceSportReportListener
+import com.veepoo.protocol.listener.data.IReportGpsDataListener
+import com.veepoo.protocol.listener.data.ISportControlOptListener
+import com.veepoo.protocol.model.datas.ReportGpsLatLongData
 import com.veepoo.protocol.listener.data.ISportModelStateListener
 import com.veepoo.protocol.model.datas.SportControlDataInfo
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage1
@@ -172,7 +175,7 @@ object BandClient {
     private fun failConnect() {
         cancelConnectTimeout()
         val was = connected || connecting
-        connected = false; connecting = false; weConnectedHeadless = false
+        connected = false; connecting = false; weConnectedHeadless = false; pollStop()
         heartOn = false; main.removeCallbacks(heartStop)
         if (syncing) { syncGen++; syncing = false; emit(mapOf("type" to "sync", "value" to "end")) }
         state("disconnected")
@@ -187,7 +190,7 @@ object BandClient {
         connected = true; connecting = false
         state("connected")
         val cbs = readyCbs; readyCbs = mutableListOf(); cbs.forEach { it(true) }
-        registerLiveSport()
+        registerLiveSport(); GpsAssist.register(app); DebugTools.startRawCapture()
         if (debuggable) main.postDelayed({ try { mgr.readCustomSetting(noop, object : ICustomSettingDataListener { override fun OnSettingDataChange(c: CustomSettingData?) { if (c != null) try { logEventFlags("custom", toJson(c)) } catch (_: Throwable) {} } }) } catch (_: Throwable) {} }, 3000) // solo depuracion: estado de los ajustes que disparan eventos
         if (autoSync) main.postDelayed({ syncAll { Agps.onConnected() } }, 1500)
     }
@@ -389,10 +392,43 @@ object BandClient {
      * No lleva posicion ni datos personales. Se registra en cada conexion; registrarlo de nuevo sustituye al anterior.
      */
     private val liveSportListener = object : IDeviceSportReportListener {
-        override fun onSportControlDataChange(d: SportControlDataInfo) {
-            try { val j = toJson(d); if (debuggable) { log("deporte-vivo $j"); DebugTools.appendLive(j) }; emit(mapOf("type" to "sportLive", "data" to j.toMap())) } catch (_: Throwable) {}
+        override fun onSportControlDataChange(d: SportControlDataInfo) { handleLive(d) }
+    }
+    /** Procesa un informe de la pulsera (el que manda ella al cambiar de estado o la respuesta a nuestra pregunta): lo reenvia y arranca o para el sondeo. */
+    private fun handleLive(d: SportControlDataInfo) {
+        try {
+            val j = toJson(d); if (debuggable) { log("deporte-vivo $j"); DebugTools.appendLive(j) }
+            emit(mapOf("type" to "sportLive", "data" to j.toMap()))
+            val st = j.optString("runState"); val op = j.optString("opCode")
+            if (op == "STOP" || st == "FINISHED") pollStop()
+            else if ((st == "RUNNING" || st == "RESUMING" || st == "PAUSED") && pollType == null) { try { pollStart(ESportType.valueOf(j.optString("sportType"))) } catch (_: Throwable) {} }
+        } catch (_: Throwable) {}
+    }
+
+    // La pulsera NO manda el informe de forma periodica (solo al iniciar, pausar, reanudar o parar): mientras hay una actividad se le pregunta cada
+    // 5 s con readSportControlInfo y la respuesta llega por el mismo camino. Se omite mientras se sincroniza y se abandona si falla varias veces seguidas.
+    private var pollType: ESportType? = null; private var pollFails = 0
+    private val pollTick = object : Runnable { override fun run() {
+        val t = pollType ?: return
+        if (connected && !syncing) { try { mgr.readSportControlInfo(noop, t, pollListener) } catch (_: Throwable) { pollFails++ } }
+        if (pollFails >= 6) { pollStop(); emit(mapOf("type" to "sport", "msg" to "La pulsera no informa en directo de la actividad")) } else if (pollType != null) main.postDelayed(this, 5000)
+    } }
+    private val pollListener = object : ISportControlOptListener {
+        override fun onSportControlOptFail() { pollFails++ }
+        override fun onSportControlOptSuccess() {}
+        override fun onSportControlDataChange(d: SportControlDataInfo) { pollFails = 0; handleLive(d) }
+    }
+    /**
+     * Posicion en directo: con setReportGps(true) la pulsera manda por su cuenta latitud, longitud y altitud (cada ~5 s mientras graba una actividad con GPS;
+     * sin posicion el paquete llega vacio). Se reenvia tal cual como {type: gpsLive, data: {...}}; la escala de los numeros se decide en Dart. Solo mientras dura la actividad.
+     */
+    private val gpsLiveListener = object : IReportGpsDataListener {
+        override fun onReportGpsDataDataChange(d: ReportGpsLatLongData) {
+            try { val j = toJson(d); if (debuggable) { log("gps-vivo (recibido)"); DebugTools.appendGps(j) }; emit(mapOf("type" to "gpsLive", "data" to j.toMap())) } catch (_: Throwable) {}
         }
     }
+    fun pollStart(t: ESportType) { if (pollType == t) return; pollType = t; pollFails = 0; main.removeCallbacks(pollTick); main.postDelayed(pollTick, 2500); try { mgr.setReportGps(noop, true, gpsLiveListener) } catch (_: Throwable) {} }
+    fun pollStop() { val was = pollType; pollType = null; main.removeCallbacks(pollTick); if (was != null) { try { mgr.setReportGps(noop, false, gpsLiveListener) } catch (_: Throwable) {} } }
     private fun JSONObject.toMap(): Map<String, Any?> { val o = HashMap<String, Any?>(); val it = keys(); while (it.hasNext()) { val k = it.next(); val v = opt(k); o[k] = if (v == JSONObject.NULL) null else v }; return o }
     fun registerLiveSport() { try { mgr.setSportControlReportListener(liveSportListener) } catch (_: Throwable) {} }
 
@@ -400,7 +436,7 @@ object BandClient {
         // Sin sustituto silencioso: un nombre desconocido no debe arrancar otro deporte (p. ej. correr).
         val t = sportTypeOf(type)
         if (t == null) { emit(mapOf("type" to "sport", "msg" to "Modo no reconocido por la SDK: $type")) }
-        else { emit(mapOf("type" to "sport", "msg" to "Orden de inicio enviada: $type (la pulsera decide si lo admite)")); mgr.startMultSportModel(noop, stateListener, t) }
+        else { emit(mapOf("type" to "sport", "msg" to "Orden de inicio enviada: $type (la pulsera decide si lo admite)")); mgr.startMultSportModel(noop, stateListener, t); pollStart(t) }
     }
     /** Nombre de la enum ESportType -> valor; NONE y desconocidos -> null. */
     internal fun sportTypeOf(name: String): ESportType? = try { ESportType.valueOf(name).takeIf { it != ESportType.NONE } } catch (e: Exception) { null }
@@ -455,7 +491,7 @@ object BandClient {
         try { mgr.stopDetectHeart(noop) } catch (e: Throwable) { log("stopDetectHeart: " + e.javaClass.simpleName) }
     }
     fun stopHeart() = main.post { stopHeartNow() }
-    fun stopSport() = main.post { mgr.stopSportModel(noop, stateListener) }
+    fun stopSport() = main.post { pollStop(); mgr.stopSportModel(noop, stateListener) }
     fun sportState() = main.post { mgr.readSportModelState(noop, stateListener) }
     fun findBand() = main.post {
         mgr.startFindDeviceByPhone(noop, object : IFindDevicelistener {
