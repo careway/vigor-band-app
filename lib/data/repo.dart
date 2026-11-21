@@ -13,6 +13,7 @@ import 'updater.dart';
 import 'sleep_stages.dart';
 import 'gps_filter.dart';
 import 'map_style.dart';
+import 'workout.dart';
 import 'sports.dart';
 export 'sleep_stages.dart';
 export 'analysis.dart' show Sample;
@@ -142,6 +143,8 @@ class VigorRepo extends ChangeNotifier {
       clock: () => clock(), canRun: () => conn == 'connected' && !syncing && !sportActive && !heart.active && !(battery != null && battery! < 20));
   /// true entre pedir un deporte y detenerlo/desconectar (conservador: durante él no se mide el pulso en vivo).
   bool sportActive = false;
+  /// Actividad en curso (iniciada desde la app o desde la pulsera) con sus datos en vivo.
+  late final LiveWorkout workout = LiveWorkout(clock: () => clock())..addListener(() { if (workout.active != sportActive) { sportActive = workout.active; notifyListeners(); } });
   bool liveOn = true; int liveSec = 10;
   /// Mapa de fondo de OpenStreetMap en las rutas (descarga teselas de openstreetmap.org; apagado = solo la ruta dibujada).
   bool mapOn = true;
@@ -240,7 +243,8 @@ class VigorRepo extends ChangeNotifier {
           reload().then((_) { if (health.master) unawaited(_exportThenClear()); }, onError: (_) {});
         }
       case 'syncProgress': final pv = m['value']; if (pv is num) progress = pv.toDouble();
-      case 'sport': sportMsgs.insert(0, '${m['msg']}'); if ('${m['msg']}' == 'Actividad detenida') sportActive = false;
+      case 'sportLive': { final d = m['data']; if (d is Map) workout.onReport(d); }
+      case 'sport': sportMsgs.insert(0, '${m['msg']}'); if ('${m['msg']}' == 'Actividad detenida') { sportActive = false; workout.end(); }
       case 'autoMeasure':
         autoUnsupported = m['unsupported'] == true;
         final it = m['items'];
@@ -281,10 +285,10 @@ class VigorRepo extends ChangeNotifier {
   Future<void> connect(String mac) async { auto.userHold = false; await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }
   Future<void> disconnect() { auto.userHold = true; return _m.invokeMethod('disconnect'); }
   Future<void> sync() => _m.invokeMethod('sync');
-  Future<void> startSport(String t) { sportActive = true; notifyListeners(); return _m.invokeMethod('startSport', {'type': t}); }
+  Future<void> startSport(String t) { sportActive = true; workout.begin(sportByKey(t)); notifyListeners(); return _m.invokeMethod('startSport', {'type': t}); }
   Future<void> readAutoMeasure() => _m.invokeMethod('readAutoMeasure');
   Future<void> setAutoMeasure(int type, bool on, {int? interval}) { autoMsg = null; return _m.invokeMethod('setAutoMeasure', {'type': type, 'on': on, 'interval': interval}); }
-  Future<void> stopSport() { sportActive = false; notifyListeners(); return _m.invokeMethod('stopSport'); }
+  Future<void> stopSport() { sportActive = false; workout.end(); notifyListeners(); return _m.invokeMethod('stopSport'); }
   /// Xiaomi/MIUI: ¿existe la pantalla de «Inicio automático»? (sin ella el sistema no arranca la app cerrada para sincronizar)
   Future<bool> autostartSupported() async { try { return (await _m.invokeMethod<bool>('autostartSupported')) ?? false; } catch (_) { return false; } }
   Future<void> openAutostartSettings() async { try { await _m.invokeMethod('openAutostartSettings'); } catch (_) {} }

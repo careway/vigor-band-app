@@ -26,7 +26,9 @@ import com.veepoo.protocol.model.datas.HeartData
 import com.veepoo.protocol.listener.data.IPwdDataListener
 import com.veepoo.protocol.listener.data.ISocialMsgDataListener
 import com.veepoo.protocol.listener.data.ISportModelOriginListener
+import com.veepoo.protocol.listener.data.IDeviceSportReportListener
 import com.veepoo.protocol.listener.data.ISportModelStateListener
+import com.veepoo.protocol.model.datas.SportControlDataInfo
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage1
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage2
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage3
@@ -185,6 +187,7 @@ object BandClient {
         connected = true; connecting = false
         state("connected")
         val cbs = readyCbs; readyCbs = mutableListOf(); cbs.forEach { it(true) }
+        registerLiveSport()
         if (debuggable) main.postDelayed({ try { mgr.readCustomSetting(noop, object : ICustomSettingDataListener { override fun OnSettingDataChange(c: CustomSettingData?) { if (c != null) try { logEventFlags("custom", toJson(c)) } catch (_: Throwable) {} } }) } catch (_: Throwable) {} }, 3000) // solo depuracion: estado de los ajustes que disparan eventos
         if (autoSync) main.postDelayed({ syncAll { Agps.onConnected() } }, 1500)
     }
@@ -380,6 +383,19 @@ object BandClient {
         }
         override fun onSportStopped() { emit(mapOf("type" to "sport", "msg" to "Actividad detenida")) }
     }
+    /**
+     * Informe en vivo de una actividad (la emite la propia pulsera mientras dura, tambien si se inicio desde el reloj): duracion, pulso, distancia,
+     * ritmo, velocidad, calorias, senal GPS y estado. Se reenvia tal cual (sin interpretar unidades) como {type: sportLive, data: {...}}.
+     * No lleva posicion ni datos personales. Se registra en cada conexion; registrarlo de nuevo sustituye al anterior.
+     */
+    private val liveSportListener = object : IDeviceSportReportListener {
+        override fun onSportControlDataChange(d: SportControlDataInfo) {
+            try { val j = toJson(d); if (debuggable) log("deporte-vivo $j"); emit(mapOf("type" to "sportLive", "data" to j.toMap())) } catch (_: Throwable) {}
+        }
+    }
+    private fun JSONObject.toMap(): Map<String, Any?> { val o = HashMap<String, Any?>(); val it = keys(); while (it.hasNext()) { val k = it.next(); val v = opt(k); o[k] = if (v == JSONObject.NULL) null else v }; return o }
+    fun registerLiveSport() { try { mgr.setSportControlReportListener(liveSportListener) } catch (_: Throwable) {} }
+
     fun startSport(type: String) = main.post {
         // Sin sustituto silencioso: un nombre desconocido no debe arrancar otro deporte (p. ej. correr).
         val t = sportTypeOf(type)

@@ -13,6 +13,7 @@ import 'ui/activity_page.dart';
 import 'ui/device_page.dart';
 import 'ui/sleep_page.dart';
 import 'ui/permission_prompt.dart';
+import 'ui/workout_ui.dart';
 import 'ui/today_page.dart';
 
 void main() {
@@ -75,9 +76,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
             else Padding(padding: const EdgeInsets.only(right: 16), child: Icon(Icons.circle, size: 10, color: repo.conn == 'connected' ? c.steps : c.muted)),
           ]),
           body: SafeArea(bottom: false, child: Column(children: [UpdateBanner(repo), Expanded(child: AnimatedSwitcher(duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 250), child: KeyedSubtree(key: ValueKey(tab), child: pages[tab])))])),
-          bottomNavigationBar: ListenableBuilder(listenable: repo.updater, builder: (context, _) => FloatNav(index: tab, onTap: (i) => setState(() => tab = i), badges: repo.updater.available ? const {3} : const {}, items: const [
+          bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+            // Isla de «actividad en curso»: encima de la barra de pestañas, solo mientras hay una actividad.
+            ActivityIsland(repo, onOpen: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => WorkoutPage(repo)))),
+            ListenableBuilder(listenable: repo.updater, builder: (context, _) => FloatNav(index: tab, onTap: (i) => setState(() => tab = i), badges: repo.updater.available ? const {3} : const {}, items: const [
             (Icons.blur_circular_outlined, Icons.blur_circular, 'Hoy'), (Icons.route_outlined, Icons.route, 'Actividad'), (Icons.bedtime_outlined, Icons.bedtime, 'Sueño'), (Icons.tune_outlined, Icons.tune, 'Ajustes'),
           ])),
+          ]),
         ));
       });
 

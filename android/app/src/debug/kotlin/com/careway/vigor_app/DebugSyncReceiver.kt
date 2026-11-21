@@ -12,6 +12,10 @@ class DebugSyncReceiver : BroadcastReceiver() {
         when (i?.getStringExtra("probe")) {
             "events" -> { EventProbe.register(); return }
             "camera" -> { EventProbe.cameraMode(); return }
+            // Solo depuracion: simula un informe en vivo de la pulsera para ver la isla y la pantalla de entreno (solo en memoria; no se guarda nada).
+            "fakeworkout" -> { val type = i.getIntExtra("type", 1); val dur = i.getIntExtra("dur", 754)
+                BandClient.emit(mapOf("type" to "sportLive", "data" to mapOf("sportType" to type, "sportDuration" to dur, "heartRate" to 148, "distance" to 2310, "pace" to 325, "speed" to 11.1, "calories" to 160, "gpsSignal" to 2, "runState" to "RUNNING"))); return }
+            "endworkout" -> { BandClient.emit(mapOf("type" to "sport", "msg" to "Actividad detenida")); return }
         }
         WorkManager.getInstance(c).enqueue(OneTimeWorkRequestBuilder<SyncWorker>().build())
     }
