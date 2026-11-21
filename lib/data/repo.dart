@@ -141,6 +141,26 @@ class VigorRepo extends ChangeNotifier {
   Future<void> setLiveOn(bool v) async { liveOn = v; live.setEnabled(v); await _m.invokeMethod('setPref', {'key': 'liveOn', 'value': v ? 1 : 0}); notifyListeners(); }
   Future<void> setLiveSec(int v) async { if (!LiveHeart.allowedIntervals.contains(v)) return; liveSec = v; live.setInterval(v); await _m.invokeMethod('setPref', {'key': 'liveSec', 'value': v}); notifyListeners(); }
 
+  final Completer<void> _ready = Completer<void>();
+  /// Se completa cuando las preferencias, los datos y Health Connect están cargados (antes de conectar con la pulsera).
+  Future<void> get ready => _ready.future;
+
+  @visibleForTesting void markReady() { if (!_ready.isCompleted) _ready.complete(); }
+
+  /// Permisos de ejecución que faltan (Android): {'missing': ['bluetooth'|'location'], 'blocked': bool}. 'blocked': el sistema ya no mostrará su diálogo.
+  Future<({List<String> missing, bool blocked})> permissionStatus() async {
+    try {
+      final r = await _m.invokeMethod<Map>('permissionStatus');
+      return (missing: [for (final x in (r?['missing'] as List? ?? const [])) x.toString()], blocked: r?['blocked'] == true);
+    } catch (_) { return (missing: <String>[], blocked: false); }
+  }
+  /// Lanza el diálogo del sistema para Bluetooth/ubicación y anota que ya se pidió (para detectar «no volver a preguntar»).
+  Future<bool> requestStartupPermissions() async {
+    final ok = await _perm(true);
+    try { await _m.invokeMethod('setPref', {'key': 'permAsked', 'value': 1}); } catch (_) {}
+    return ok;
+  }
+
   Future<void> init() async {
     addListener(live.recheck); heart.addListener(live.recheck);
     _sub = _e.receiveBroadcastStream().listen(_onEvent);
@@ -159,6 +179,7 @@ class VigorRepo extends ChangeNotifier {
     try { _readSyncInfo(await _m.invokeMethod('syncInfo')); } catch (_) {}
     try { await reload(); } catch (e) { loadError = 'datos: ${e.runtimeType}'; loaded = true; }
     try { await health.init(healthPrefs); } catch (_) {}
+    if (!_ready.isCompleted) _ready.complete();
     try { agps = await _m.invokeMethod<Map>('agpsStatus') ?? {}; } catch (_) {}
     notifyListeners();
     unawaited(updater.init());

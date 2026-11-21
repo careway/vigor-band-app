@@ -258,6 +258,9 @@ class HealthSync extends ChangeNotifier {
     }
   }
 
+  /// Pide en el sistema los permisos que faltan de las categorías activas (lo usa el aviso de permisos del arranque).
+  Future<void> askMissingPermissions() => _requestForEnabled();
+
   Future<void> _requestForEnabled() async {
     final need = <HType>{for (final c in HealthCat.values) if (cats[c] == true && granted[c] != true) ..._typesFor(c)};
     if (need.isNotEmpty) { try { await gateway.requestPermissions(need); } catch (_) {} }

@@ -168,3 +168,4 @@ Leyenda: **código** = implementado; **test** = cubierto por test automático (s
 | 90 | P1 | DEV_012-2: SyncWorker periódico con la app cerrada (solo pantalla encendida, batería no baja, sin reintentos) | Desarrollador | implementado, no probado en hardware con pulsera; programación y salida limpia sin pulsera verificadas en el Mi 9 |
 | 91 | P1 | DEV_012-3: exportación a Health Connect sin interfaz (FlutterEngine + punto de entrada Dart), activada de serie | Desarrollador | ver DEV_012 para lo verificado |
 | 92 | P1 | Probar con la pulsera real: sincronización en segundo plano con pantalla encendida, ahorro de batería MIUI, consumo | Usuario + QA | pendiente |
+| 93 | P1 | DEV_013: al iniciar la app, explicar y pedir los permisos que faltan (Bluetooth en Android 12+, ubicación en Android 11-, Health Connect si se comparte), una sola vez por inicialización | Desarrollador | hecho; visto en el Mi 9 (Android 10, ubicación revocada con ADB) |

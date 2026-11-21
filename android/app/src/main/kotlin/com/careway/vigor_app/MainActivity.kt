@@ -76,6 +76,13 @@ class MainActivity : FlutterFragmentActivity() {
                             permQueue.drainLate().forEach { (r, ok) -> try { r.success(ok) } catch (_: Throwable) {} } // H3: nunca queda un Result colgado
                         }
                     }
+                    "permissionStatus" -> {
+                        val granted = { x: String -> checkSelfPermission(x) == PackageManager.PERMISSION_GRANTED }
+                        val asked = getSharedPreferences("vigor_prefs", MODE_PRIVATE).getInt("permAsked", 0) == 1
+                        result.success(mapOf(
+                            "missing" to StartupPermissions.missing(Build.VERSION.SDK_INT, granted).map { it.wire },
+                            "blocked" to StartupPermissions.blocked(Build.VERSION.SDK_INT, asked, granted) { x -> shouldShowRequestPermissionRationale(x) }))
+                    }
                     "startScan" -> { startScan(); result.success(null) }
                     "stopScan" -> { mgr.stopScanDevice(); result.success(null) }
                     "connect" -> {

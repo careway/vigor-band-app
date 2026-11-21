@@ -12,6 +12,7 @@ import 'ui/about_page.dart';
 import 'ui/activity_page.dart';
 import 'ui/device_page.dart';
 import 'ui/sleep_page.dart';
+import 'ui/permission_prompt.dart';
 import 'ui/today_page.dart';
 
 void main() {
@@ -48,7 +49,11 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> with WidgetsBindingObserver {
   VigorRepo get repo => widget.repo; int tab = 0;
   @override
-  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); }
+  void initState() {
+    super.initState(); WidgetsBinding.instance.addObserver(this);
+    // Permisos que faltan: se explican y se piden al iniciar la app (una sola vez por arranque).
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) askMissingPermissionsOnce(context, repo); });
+  }
   @override
   void dispose() { WidgetsBinding.instance.removeObserver(this); super.dispose(); }
   /// Al volver a primer plano: comprobar versión (silencioso, con límite de 15 min).
