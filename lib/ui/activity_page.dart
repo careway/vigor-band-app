@@ -5,9 +5,12 @@ import '../theme/tokens.dart';
 import '../data/sports.dart';
 import 'delete_ui.dart';
 import 'night_cards.dart';
+import 'sport_menu.dart';
 import 'sport_picker.dart';
 import 'widgets.dart';
 
+/// Pantalla de Actividad: arriba lo que se puede hacer (atajos con lo más frecuente y «Iniciar nueva actividad» con su menú de familias y
+/// modos); debajo, SOLO lo realizado hoy. El resto (días anteriores, resumen semanal, borrado por lotes) está en «Historial».
 class ActivityPage extends StatefulWidget {
   final VigorRepo repo; const ActivityPage(this.repo, {super.key});
   @override
@@ -16,65 +19,114 @@ class ActivityPage extends StatefulWidget {
 
 class _ActivityPageState extends State<ActivityPage> {
   SportMode mode = sportByKey('OUTDOOR_RUNNING')!;
-  bool selecting = false; final sel = <String>{};
+  bool _picked = false; // ¿el usuario ya eligió un modo? (si no, se propone el más frecuente)
 
   @override
   Widget build(BuildContext context) {
-    final c = VC.of(context); final r = widget.repo; final col = groupColor(c, mode.group);
-    final ok = r.conn == 'connected';
+    final c = VC.of(context); final r = widget.repo;
+    final quick = frequentSportModes([for (final s in r.sessions) (type: s.sportType, start: s.start)]);
+    final cur = _picked ? mode : quick.first;
+    final col = groupColor(c, cur.group); final ok = r.conn == 'connected';
+    final today = [for (final s in r.sessions) if (startedOnSameDay(s.start, r.clock())) s];
     return ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
       Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        MetricHeader(Icons.route, 'Iniciar desde el móvil', c.route),
+        MetricHeader(Icons.route, 'Iniciar una actividad', c.route),
         const SizedBox(height: Sp.x3),
-        Semantics(button: true, label: 'Modo deportivo: ${mode.name}. Cambiar', child: ExcludeSemantics(child: Material(
-          color: col.withValues(alpha: .14), borderRadius: BorderRadius.circular(20),
-          child: InkWell(borderRadius: BorderRadius.circular(20), onTap: () async {
-            final m = await showSportPicker(context, mode.id);
-            if (m != null) setState(() => mode = m);
-          }, child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 72), child: Padding(padding: const EdgeInsets.all(Sp.x3), child: Row(children: [
-            CircleAvatar(radius: 24, backgroundColor: col.withValues(alpha: .25), child: Icon(mode.icon, color: col, size: 28)), const SizedBox(width: Sp.x3),
+        Text('Más frecuentes', style: VT.caption(c)), const SizedBox(height: Sp.x2),
+        Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [for (final m in quick) _QuickChip2(m, selected: m.id == cur.id, onTap: () => setState(() { mode = m; _picked = true; }))]),
+        const SizedBox(height: Sp.x3),
+        OutlinedButton.icon(style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: () async {
+          final m = await showSportMenu(context, selectedId: cur.id); if (m != null) setState(() { mode = m; _picked = true; });
+        }, icon: const Icon(Icons.add), label: const Text('Iniciar nueva actividad…')),
+        const SizedBox(height: Sp.x3),
+        Semantics(container: true, label: 'Actividad elegida: ${cur.name}. ${cur.group.label}. ${cur.tracksRoute ? 'Recorrido con GPS' : 'Interior, sin GPS'}', child: ExcludeSemantics(child: Container(
+          padding: const EdgeInsets.all(Sp.x3), decoration: BoxDecoration(color: col.withValues(alpha: .14), borderRadius: BorderRadius.circular(16)),
+          child: Row(children: [
+            Icon(cur.icon, color: col, size: 26), const SizedBox(width: Sp.x3),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(mode.name, style: VT.title(c).copyWith(fontSize: 20)),
-              Text('${mode.group.label} · ${mode.tracksRoute ? 'recorrido con GPS' : 'interior, sin GPS'}', style: VT.caption(c)),
+              Text(cur.name, style: VT.heading(c)), Text('${cur.group.label} · ${cur.tracksRoute ? 'recorrido con GPS' : 'interior, sin GPS'}', style: VT.caption(c)),
             ])),
-            Text('Cambiar', style: VT.caption(c).copyWith(color: c.accent, fontWeight: FontWeight.w700)), const Icon(Icons.expand_more),
           ])))),
-        ))),
         const SizedBox(height: Sp.x3),
         Row(children: [
-          Expanded(flex: 3, child: FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 52)), onPressed: ok ? () => r.startSport(mode.key) : null, icon: const Icon(Icons.play_arrow), label: const Text('Iniciar'))),
+          Expanded(flex: 3, child: FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 52)), onPressed: ok ? () => r.startSport(cur.key) : null, icon: const Icon(Icons.play_arrow), label: const Text('Iniciar'))),
           const SizedBox(width: Sp.x2),
-          Expanded(flex: 2, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(minimumSize: const Size(48, 52)), onPressed: ok ? r.stopSport : null, icon: const Icon(Icons.stop), label: const Text('Parar'))),
+          Expanded(flex: 2, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(minimumSize: const Size(48, 52)), onPressed: ok ? r.stopSport : null, icon: const Icon(Icons.stop), label: const Text('Detener'))),
         ]),
         if (!ok) const Note('Conecta la pulsera para iniciar una actividad.'),
-        Note(mode.tracksRoute ? 'Modo de recorrido: la pulsera graba sola, con su propio GPS si el modo lo usa (no verificado por modo); luego verás ruta, distancia y ritmo. El móvil solo da la orden y puede desconectarse.' : 'Modo de interior: no se usa ni se pide GPS. Verás duración, pulso y calorías. El móvil solo da la orden y puede desconectarse.'),
+        Note(cur.tracksRoute ? 'Modo de recorrido: la pulsera graba sola, con su propio GPS si el modo lo usa (no verificado por modo); luego verás ruta, distancia y ritmo.' : 'Modo de interior: sin GPS; verás duración, pulso y calorías.'),
         const Note('La SDK no indica qué modos admite tu pulsera: si no admite el elegido, no empezará.'),
         if (r.sportMsgs.isNotEmpty) Note(r.sportMsgs.first),
       ])),
-      WeeklyActivityCard(r),
-      if (r.ageIsDefault) Note('Edad no indicada: el cómputo por pulso, las zonas y el TRIMP usan ${VigorRepo.defaultAge} años por defecto. Indícala en Dispositivo → Perfil.'),
-      SectionHeader('Actividades guardadas', trailing: r.sessions.isEmpty ? null : TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: () => setState(() { selecting = !selecting; sel.clear(); }), child: Text(selecting ? 'Cancelar' : 'Seleccionar'))),
-      if (selecting) Panel(child: Row(children: [
-        Expanded(child: Text(sel.isEmpty ? 'Toca las sesiones que quieras borrar.' : '${sel.length} seleccionada(s)', style: VT.body(c))),
-        FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 48), backgroundColor: c.danger), onPressed: sel.isEmpty ? null : () async {
-          final keys = sel.toList(); final done = await confirmAndDelete(context, r, type: 'session', keys: keys, title: 'Borrar ${keys.length} sesión(es)', what: 'Se borrarán ${keys.length} sesiones deportivas, con su ruta y pulso por minuto.');
-          if (done && mounted) setState(() { selecting = false; sel.clear(); });
-        }, icon: const Icon(Icons.delete_outline), label: const Text('Borrar')),
-      ])),
-      if (r.sessions.isEmpty) const SizedBox(height: 240, child: EmptyState(Icons.directions_run, 'Aún no hay actividades. Sincroniza la pulsera para leerlas.'))
-      else for (final s in r.sessions) _tile(context, c, r, s),
+      if (r.ageIsDefault) Note('Edad no indicada: el cómputo por pulso, las zonas y el TRIMP usan ${VigorRepo.defaultAge} años por defecto. Indícala en Ajustes → Perfil.'),
+      SectionHeader('Actividad de hoy', trailing: r.sessions.isEmpty ? null : TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SessionHistoryPage(r))), child: const Text('Historial'))),
+      if (today.isEmpty) Panel(child: Padding(padding: const EdgeInsets.symmetric(vertical: Sp.x2), child: Text(r.sessions.isEmpty ? 'Aún no hay actividades. Sincroniza la pulsera para leerlas.' : 'Hoy aún no has hecho ninguna actividad. Las de otros días están en «Historial».', style: VT.body(c).copyWith(color: c.muted))))
+      else for (final s in today) SessionTile(r, s),
       const Note('Calorías, distancia y ritmo los calcula la pulsera (algoritmo del fabricante).'),
     ]);
   }
+}
 
-  Widget _tile(BuildContext context, VC c, VigorRepo r, Session s) {
+class _QuickChip2 extends StatelessWidget {
+  final SportMode m; final bool selected; final VoidCallback onTap;
+  const _QuickChip2(this.m, {required this.selected, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final c = VC.of(context); final col = groupColor(c, m.group);
+    return Semantics(button: true, selected: selected, label: m.name, child: ExcludeSemantics(child: Material(
+      color: selected ? col.withValues(alpha: .22) : c.surfaceHi, shape: StadiumBorder(side: BorderSide(color: selected ? col : Colors.transparent, width: 1.5)),
+      child: InkWell(customBorder: const StadiumBorder(), onTap: onTap, child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48), child: Padding(padding: const EdgeInsets.symmetric(horizontal: Sp.x3),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(m.icon, size: 20, color: col), const SizedBox(width: Sp.x2), Flexible(child: Text(m.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: VT.body(c)))]))))),
+    ));
+  }
+}
+
+/// Historial: resumen semanal y todas las actividades guardadas, con selección para borrar varias.
+class SessionHistoryPage extends StatefulWidget {
+  final VigorRepo repo; const SessionHistoryPage(this.repo, {super.key});
+  @override
+  State<SessionHistoryPage> createState() => _SessionHistoryPageState();
+}
+
+class _SessionHistoryPageState extends State<SessionHistoryPage> {
+  bool selecting = false; final sel = <String>{};
+  @override
+  Widget build(BuildContext context) {
+    final c = VC.of(context); final r = widget.repo;
+    return ListenableBuilder(listenable: r, builder: (context, _) => Scaffold(
+      appBar: AppBar(title: const Text('Historial de actividades')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
+        WeeklyActivityCard(r),
+        SectionHeader('Actividades guardadas', trailing: r.sessions.isEmpty ? null : TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48)), onPressed: () => setState(() { selecting = !selecting; sel.clear(); }), child: Text(selecting ? 'Cancelar' : 'Seleccionar'))),
+        if (selecting) Panel(child: Row(children: [
+          Expanded(child: Text(sel.isEmpty ? 'Toca las sesiones que quieras borrar.' : '${sel.length} seleccionada(s)', style: VT.body(c))),
+          FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 48), backgroundColor: c.danger), onPressed: sel.isEmpty ? null : () async {
+            final keys = sel.toList(); final done = await confirmAndDelete(context, r, type: 'session', keys: keys, title: 'Borrar ${keys.length} sesión(es)', what: 'Se borrarán ${keys.length} sesiones deportivas de la app, con su ruta y pulso por minuto.');
+            if (done && mounted) setState(() { selecting = false; sel.clear(); });
+          }, icon: const Icon(Icons.delete_outline), label: const Text('Borrar')),
+        ])),
+        if (r.sessions.isEmpty) const SizedBox(height: 240, child: EmptyState(Icons.directions_run, 'Aún no hay actividades. Sincroniza la pulsera para leerlas.'))
+        else for (final s in r.sessions) SessionTile(r, s, selecting: selecting, selected: sel.contains(s.key), onToggle: () => setState(() { if (!sel.remove(s.key)) sel.add(s.key); })),
+      ]),
+    ));
+  }
+}
+
+/// Tarjeta de una sesión: icono, nombre, fecha y datos principales. Toca para abrir el detalle (o para marcarla si se está seleccionando).
+class SessionTile extends StatelessWidget {
+  final VigorRepo repo; final Session s; final bool selecting, selected; final VoidCallback? onToggle;
+  const SessionTile(this.repo, this.s, {super.key, this.selecting = false, this.selected = false, this.onToggle});
+  @override
+  Widget build(BuildContext context) {
+    final c = VC.of(context); final r = repo;
     final hrMax = hrMaxTanaka(r.age);
     final trimp = s.hrPerMinute.isEmpty ? null : edwardsTrimp(zoneMinutes(s.hrPerMinute, hrMax));
     final m = sportById(s.sportType); final col = m == null ? c.exp : groupColor(c, m.group);
     final name = sportLabel(s.sportType); final when = '${s.start.year}-${two(s.start.month)}-${two(s.start.day)} ${hm(s.start)}';
-    return Panel(padding: EdgeInsets.zero, child: Semantics(button: true, selected: selecting && sel.contains(s.key), label: '${selecting ? (sel.contains(s.key) ? 'Seleccionada. ' : 'No seleccionada. ') : ''}$name, $when, ${dur(s.seconds)}, ${(s.meters / 1000).toStringAsFixed(2)} kilómetros', child: ExcludeSemantics(child: InkWell(
+    return Panel(padding: EdgeInsets.zero, child: Semantics(button: true, selected: selecting && selected, label: '${selecting ? (selected ? 'Seleccionada. ' : 'No seleccionada. ') : ''}$name, $when, ${dur(s.seconds)}, ${(s.meters / 1000).toStringAsFixed(2)} kilómetros', child: ExcludeSemantics(child: InkWell(
       borderRadius: BorderRadius.circular(24),
-      onTap: selecting ? () => setState(() { if (!sel.remove(s.key)) sel.add(s.key); }) : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SessionPage(r, s))),
+      onTap: selecting ? () => onToggle : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SessionPage(r, s))),
       child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48), child: Padding(padding: const EdgeInsets.all(Sp.x4), child: Row(children: [
         CircleAvatar(radius: 22, backgroundColor: col.withValues(alpha: .2), child: Icon(sportIcon(s.sportType), color: col)), const SizedBox(width: Sp.x3),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -86,7 +138,7 @@ class _ActivityPageState extends State<ActivityPage> {
             if (s.avgHr > 0) _chip(c, Icons.favorite, '${s.avgHr} bpm', c.heart), if (trimp != null) _chip(c, Icons.speed, 'TRIMP $trimp'), if (s.hasGps && m?.tracksRoute != false) _chip(c, Icons.route, 'GPS', c.route),
           ]),
         ])),
-        selecting ? Icon(sel.contains(s.key) ? Icons.check_circle : Icons.radio_button_unchecked, color: sel.contains(s.key) ? c.accent : c.muted) : const Icon(Icons.chevron_right),
+        selecting ? Icon(selected ? Icons.check_circle : Icons.radio_button_unchecked, color: selected ? c.accent : c.muted) : const Icon(Icons.chevron_right),
       ]))),
     ))));
   }
@@ -94,6 +146,7 @@ class _ActivityPageState extends State<ActivityPage> {
   Widget _chip(VC c, IconData i, String t, [Color? col]) => Container(
         padding: const EdgeInsets.symmetric(horizontal: Sp.x2, vertical: 3), decoration: BoxDecoration(color: c.surfaceHi, borderRadius: BorderRadius.circular(10)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(i, size: 14, color: col ?? c.muted), const SizedBox(width: 4), Text(t, style: VT.caption(c).copyWith(color: c.text))]));
+
 }
 
 class SessionPage extends StatelessWidget {

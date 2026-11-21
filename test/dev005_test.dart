@@ -63,8 +63,7 @@ void main() {
       bm.setMockMethodCallHandler(_mc, (c) async { calls.add(c); return null; });
       final r = VigorRepo(); r.conn = 'connected';
       await pump(t, ActivityPage(r));
-      await t.tap(find.textContaining('Cambiar')); await t.pumpAndSettle();
-      expect(find.text('Elige el modo deportivo'), findsOneWidget);
+      await t.tap(find.textContaining('Iniciar nueva actividad')); await t.pumpAndSettle();
       await t.enterText(find.byType(TextField), 'yoga'); await t.pumpAndSettle();
       await t.tap(find.text('Yoga').last); await t.pumpAndSettle();
       expect(find.textContaining('interior, sin GPS'), findsWidgets);
@@ -80,10 +79,10 @@ void main() {
       h.dispose();
     });
     testWidgets('lista de sesiones: nombre e icono por tipo', (t) async {
-      final r = VigorRepo(); r.sessions = [sess(12), sess(5, gps: true), sess(9999)];
+      final r = VigorRepo(); r.clock = () => DateTime(2026, 3, 5, 18); r.sessions = [sess(12), sess(5, gps: true), sess(9999)]; // «hoy» = el día de las sesiones
       await pump(t, ActivityPage(r), size: const Size(360, 3000));
       expect(find.text('Actividad (9999)'), findsOneWidget); expect(other, isEmpty);
-      expect(find.text('Natación'), findsOneWidget);
+      expect(find.descendant(of: find.byType(SessionTile), matching: find.text('Natación')), findsOneWidget); // y también como atajo (es de los más frecuentes)
     });
   });
 

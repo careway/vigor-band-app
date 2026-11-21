@@ -253,3 +253,18 @@ String _fold(String s) {
   for (final ch in s.toLowerCase().split('')) { final i = from.indexOf(ch); b.write(i >= 0 ? to[i] : ch); }
   return b.toString();
 }
+
+/// Atajos de actividad: los modos que más ha practicado el usuario (por número de sesiones guardadas; a igualdad, el más reciente primero),
+/// completados con [defaults] hasta [n]. Los tipos desconocidos (sin modo en la SDK) no se ofrecen. Lógica pura.
+List<SportMode> frequentSportModes(Iterable<({int type, DateTime start})> sessions, {int n = 4, List<String> defaults = const ['OUTDOOR_RUNNING', 'OUTDOOR_WALK', 'OUTDOOR_RIDING', 'FITNESS']}) {
+  final count = <int, int>{}; final last = <int, DateTime>{};
+  for (final s in sessions) { count[s.type] = (count[s.type] ?? 0) + 1; final l = last[s.type]; if (l == null || s.start.isAfter(l)) last[s.type] = s.start; }
+  final ids = count.keys.where((t) => _byId[t] != null).toList()
+    ..sort((a, b) { final c = count[b]!.compareTo(count[a]!); return c != 0 ? c : last[b]!.compareTo(last[a]!); });
+  final out = <SportMode>[for (final t in ids.take(n)) _byId[t]!];
+  for (final k in defaults) { if (out.length >= n) break; final m = _byKey[k]; if (m != null && !out.contains(m)) out.add(m); }
+  return out;
+}
+
+/// ¿La sesión empezó el mismo día natural que [now]? (la pantalla de Actividad solo muestra lo de hoy)
+bool startedOnSameDay(DateTime start, DateTime now) => start.year == now.year && start.month == now.month && start.day == now.day;

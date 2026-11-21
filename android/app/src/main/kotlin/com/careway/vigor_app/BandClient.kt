@@ -86,6 +86,14 @@ object BandClient {
     private var connectStartedAt = 0L
     /** Solo depuracion: ultimos paquetes de funciones del dispositivo (para ver p. ej. precisionSleep). */
     private val fnPkgs = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
+    /** Solo depuracion: indicadores de funciones que la pulsera puede DISPARAR (buscar movil, camara, musica, SOS, golpecito, llamadas, control de deporte). Sin datos personales. */
+    private fun logEventFlags(pkg: String, j: JSONObject) {
+        val re = Regex("find|camera|music|sos|knock|click|call|sport|ptt|wearhand|vibrat|longpress|lockscreen|phone", RegexOption.IGNORE_CASE)
+        val out = StringBuilder(); val it = j.keys()
+        while (it.hasNext()) { val k = it.next(); if (re.containsMatchIn(k)) out.append(k).append('=').append(j.opt(k)).append(' ') }
+        if (out.isNotEmpty()) log("flags $pkg: $out")
+    }
+
     fun functionValue(name: String): Any? { for (j in fnPkgs.values) if (j.has(name)) return j.opt(name); return null }
     private var statusMac: String? = null
     private var readyCbs = mutableListOf<(Boolean) -> Unit>()
@@ -177,6 +185,7 @@ object BandClient {
         connected = true; connecting = false
         state("connected")
         val cbs = readyCbs; readyCbs = mutableListOf(); cbs.forEach { it(true) }
+        if (debuggable) main.postDelayed({ try { mgr.readCustomSetting(noop, object : ICustomSettingDataListener { override fun OnSettingDataChange(c: CustomSettingData?) { if (c != null) try { logEventFlags("custom", toJson(c)) } catch (_: Throwable) {} } }) } catch (_: Throwable) {} }, 3000) // solo depuracion: estado de los ajustes que disparan eventos
         if (autoSync) main.postDelayed({ syncAll { Agps.onConnected() } }, 1500)
     }
 
@@ -193,17 +202,17 @@ object BandClient {
                 override fun onFunctionSupportDataChange(d: FunctionDeviceSupportData?) = onMain {
                     d?.let { val j = toJson(it); val w = maxOf(j.optInt("watchday"), j.optInt("watchDay")); if (w in 1..30) watchday = w }; log("Funciones recibidas (dias de datos: $watchday)"); onVerified()
                 }
-                override fun onDeviceFunctionPackage1Report(d: DeviceFunctionPackage1?) { if (debuggable) { d?.let { fnPkgs["pkg1"] = toJson(it) }; log("Pkg1 recibido") } }
-                override fun onDeviceFunctionPackage2Report(d: DeviceFunctionPackage2?) { if (debuggable) { d?.let { fnPkgs["pkg2"] = toJson(it) }; log("Pkg2 recibido") } }
-                override fun onDeviceFunctionPackage3Report(d: DeviceFunctionPackage3?) { if (debuggable) { d?.let { fnPkgs["pkg3"] = toJson(it) }; log("Pkg3 recibido") } }
-                override fun onDeviceFunctionPackage4Report(d: DeviceFunctionPackage4?) { if (debuggable) { d?.let { fnPkgs["pkg4"] = toJson(it) }; log("Pkg4 recibido") } }
-                override fun onDeviceFunctionPackage5Report(d: DeviceFunctionPackage5?) { if (debuggable) { d?.let { fnPkgs["pkg5"] = toJson(it) }; log("Pkg5 recibido") } }
+                override fun onDeviceFunctionPackage1Report(d: DeviceFunctionPackage1?) { if (debuggable) { d?.let { fnPkgs["pkg1"] = toJson(it); logEventFlags("pkg1", fnPkgs["pkg1"]!!) }; log("Pkg1 recibido") } }
+                override fun onDeviceFunctionPackage2Report(d: DeviceFunctionPackage2?) { if (debuggable) { d?.let { fnPkgs["pkg2"] = toJson(it); logEventFlags("pkg2", fnPkgs["pkg2"]!!) }; log("Pkg2 recibido") } }
+                override fun onDeviceFunctionPackage3Report(d: DeviceFunctionPackage3?) { if (debuggable) { d?.let { fnPkgs["pkg3"] = toJson(it); logEventFlags("pkg3", fnPkgs["pkg3"]!!) }; log("Pkg3 recibido") } }
+                override fun onDeviceFunctionPackage4Report(d: DeviceFunctionPackage4?) { if (debuggable) { d?.let { fnPkgs["pkg4"] = toJson(it); logEventFlags("pkg4", fnPkgs["pkg4"]!!) }; log("Pkg4 recibido") } }
+                override fun onDeviceFunctionPackage5Report(d: DeviceFunctionPackage5?) { if (debuggable) { d?.let { fnPkgs["pkg5"] = toJson(it); logEventFlags("pkg5", fnPkgs["pkg5"]!!) }; log("Pkg5 recibido") } }
             },
             object : ISocialMsgDataListener {
                 override fun onSocialMsgSupportDataChange(p0: FunctionSocailMsgData?) {}
                 override fun onSocialMsgSupportDataChange2(p0: FunctionSocailMsgData?) {}
             },
-            object : ICustomSettingDataListener { override fun OnSettingDataChange(c: CustomSettingData?) {} },
+            object : ICustomSettingDataListener { override fun OnSettingDataChange(c: CustomSettingData?) { if (debuggable && c != null) try { logEventFlags("custom", toJson(c)) } catch (_: Throwable) {} } },
             pwd, false)
     }
 
