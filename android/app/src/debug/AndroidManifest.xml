@@ -4,4 +4,9 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- SOLO en la compilacion de depuracion (no existe en release): permite lanzar el SyncWorker ahora mismo desde adb para probarlo,
+         porque WorkManager descarta una tarea periodica forzada antes de su hora. -->
+    <application>
+        <receiver android:name="com.careway.vigor_app.DebugSyncReceiver" android:exported="true" />
+    </application>
 </manifest>

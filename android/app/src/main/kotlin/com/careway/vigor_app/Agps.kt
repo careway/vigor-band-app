@@ -184,7 +184,7 @@ object Agps {
 
 class AgpsWorker(ctx: Context, p: WorkerParameters) : Worker(ctx, p) {
     override fun doWork(): Result {
-        BandClient.init(applicationContext)
+        if (!BandBoot.ensure(applicationContext)) return Result.success() // sin cliente Bluetooth (hilo principal) no hay nada que hacer: reintenta el siguiente periodo
         return try { Agps.workerRun(runAttemptCount) } catch (e: Throwable) { if (BandClient.debuggable) Log.w("VIGORLOG", "AgpsWorker: ${e.javaClass.simpleName}"); if (AgpsRules.shouldRetry(runAttemptCount)) Result.retry() else Result.failure() }
     }
 }

@@ -165,6 +165,8 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     "clearExportDirty" -> { SyncPrefs.clearDirty(applicationContext); result.success(null) }
                     "hasConnectPermission" -> result.success(Build.VERSION.SDK_INT < 31 || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)
+                    "autostartSupported" -> result.success(MiuiAutostart.supported(this))
+                    "openAutostartSettings" -> result.success(MiuiAutostart.open(this))
                     "openBatterySettings" -> result.success(try { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true } catch (_: Throwable) { false })
                     else -> result.notImplemented()
                 }

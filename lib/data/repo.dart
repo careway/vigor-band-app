@@ -241,6 +241,9 @@ class VigorRepo extends ChangeNotifier {
   Future<void> readAutoMeasure() => _m.invokeMethod('readAutoMeasure');
   Future<void> setAutoMeasure(int type, bool on, {int? interval}) { autoMsg = null; return _m.invokeMethod('setAutoMeasure', {'type': type, 'on': on, 'interval': interval}); }
   Future<void> stopSport() { sportActive = false; notifyListeners(); return _m.invokeMethod('stopSport'); }
+  /// Xiaomi/MIUI: ¿existe la pantalla de «Inicio automático»? (sin ella el sistema no arranca la app cerrada para sincronizar)
+  Future<bool> autostartSupported() async { try { return (await _m.invokeMethod<bool>('autostartSupported')) ?? false; } catch (_) { return false; } }
+  Future<void> openAutostartSettings() async { try { await _m.invokeMethod('openAutostartSettings'); } catch (_) {} }
   Future<void> openBatterySettings() async { try { await _m.invokeMethod('openBatterySettings'); } catch (_) {} }
   Future<void> findBand() => _m.invokeMethod('findBand');
   Future<void> forget() async { await _m.invokeMethod('forgetMac'); savedMac = null; notifyListeners(); }

@@ -1,3 +1,7 @@
+// El punto de entrada de la exportación a Health Connect sin interfaz (lo lanza Kotlin con un motor propio) debe estar en el programa:
+// sin este import el compilador no incluye la biblioteca y el motor falla con «library not found».
+// ignore: unused_import
+import 'background_export.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'data/analysis.dart';

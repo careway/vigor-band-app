@@ -64,7 +64,7 @@ class SyncWorker(ctx: Context, p: WorkerParameters) : Worker(ctx, p) {
         try { c.registerReceiver(rcv, IntentFilter(Intent.ACTION_SCREEN_OFF)) } catch (_: Throwable) {} // en ejecucion, no en el manifiesto
         var session = "SKIP"; var synced = false; var export: String? = null
         try {
-            BandClient.init(c)
+            if (!BandBoot.ensure(c)) { session = "ERROR" } else {
             if (SyncRules.recentEnough(System.currentTimeMillis(), SyncPrefs.lastOkAt(c), SyncPrefs.minutes(c))) session = "RECENT"
             else {
                 val before = SyncPrefs.lastOkAt(c)
@@ -74,11 +74,12 @@ class SyncWorker(ctx: Context, p: WorkerParameters) : Worker(ctx, p) {
             val appOpen = BandClient.listener != null
             if (SyncRules.mayContinue(screenOnly, interactive()) && SyncRules.exportNeeded(SyncPrefs.hcOn(c), SyncPrefs.dirty(c), appOpen, SyncPrefs.bgExport(c)))
                 export = BackgroundExport.runBlocking(c, SyncRules.EXPORT_TIMEOUT_SEC)
+            }
         } catch (e: Throwable) { session = "ERROR" }
         finally { try { c.unregisterReceiver(rcv) } catch (_: Throwable) {}; Thread.interrupted() }
         val label = SyncRules.label(session, synced, export)
         SyncPrefs.record(c, label)
-        if (BandClient.debuggable) Log.i("VIGORLOG", "SyncWorker $label")
+        try { if (BandClient.debuggable) Log.i("VIGORLOG", "SyncWorker $label") } catch (_: Throwable) {} // BandClient puede no haberse inicializado
         return Result.success()
     }
 }
