@@ -195,6 +195,7 @@ class MainActivity : FlutterFragmentActivity() {
                             permQueue.drainLate().forEach { (r, ok) -> try { r.success(ok) } catch (_: Throwable) {} }
                         } else result.success(true)
                     }
+                    "checkActivity" -> { BandClient.checkRunningSport(); result.success(null) }
                     "startHeart" -> { BandClient.startHeart(); result.success(null) }
                     "stopHeart" -> { BandClient.stopHeart(); result.success(null) }
                     "appVersion" -> {
@@ -202,7 +203,9 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success(mapOf("code" to androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(pi), "name" to (pi.versionName ?: "")))
                     }
                     "updateDir" -> result.success(updateDir().apply { mkdirs() }.absolutePath)
-                    "cleanUpdates" -> { try { updateDir().deleteRecursively() } catch (_: Throwable) {}; result.success(null) }
+                    "cleanUpdates" -> { pruneUpdates(); result.success(null) }
+                    "pendingUpdate" -> ioExec.execute { val out = try { pendingUpdate() } catch (_: Throwable) { null }; runOnUiThread { try { result.success(out) } catch (_: Throwable) {} } }
+                    "fileMd5" -> { val n = call.argument<String>("name"); ioExec.execute { val out = try { if (UpdateRules.safeName(n)) UpdateRules.md5Hex(java.io.File(updateDir(), n!!)) else null } catch (_: Throwable) { null }; runOnUiThread { try { result.success(out) } catch (_: Throwable) {} } } }
                     "openUrl" -> {
                         val u = android.net.Uri.parse(call.argument<String>("url") ?: "")
                         if (OpenUrlRules.allowed(u.scheme, u.host)) { startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE)); result.success(true) } else result.success(false)
@@ -249,6 +252,38 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private fun updateDir() = java.io.File(cacheDir, "updates")
+    private val UPDATE_APK = "vigor-update.apk"
+
+    /** Version (versionCode) del APK descargado si es un APK de Vigor MAS NUEVO que el instalado; null si no es valido o ya esta instalado (o es mas viejo). */
+    private fun newerApkCode(f: java.io.File): Long? {
+        return try {
+            val info = packageManager.getPackageArchiveInfo(f.absolutePath, 0) ?: return null
+            val cur = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(packageManager.getPackageInfo(packageName, 0))
+            val cand = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info)
+            if (UpdateRules.acceptable(packageName, info.packageName, cur, cand)) cand else null
+        } catch (_: Throwable) { null }
+    }
+
+    /**
+     * Un APK descargado se conserva hasta que se instale: si no se llego a instalar sigue ahi y no se vuelve a descargar. Se borra cuando ya esta
+     * instalado (su version ya no es mayor que la de la app), cuando no es valido y las descargas a medias (.part).
+     */
+    private fun pruneUpdates() {
+        try {
+            for (f in updateDir().listFiles() ?: return) {
+                if (f.name == UPDATE_APK && f.isFile && newerApkCode(f) != null) continue
+                f.deleteRecursively()
+            }
+        } catch (_: Throwable) {}
+    }
+
+    /** El APK pendiente de instalar (descargado y mas nuevo que el instalado), o null. */
+    private fun pendingUpdate(): Map<String, Any>? {
+        pruneUpdates()
+        val f = java.io.File(updateDir(), UPDATE_APK)
+        val code = if (f.isFile) newerApkCode(f) else null
+        return if (code == null) null else mapOf("name" to UPDATE_APK, "code" to code, "size" to f.length(), "md5" to UpdateRules.md5Hex(f))
+    }
 
     /** Abre el instalador de paquetes del sistema con el APK descargado (FileProvider, lectura temporal). Devuelve "started" o "needsPermission". No instala nada por su cuenta. */
     private fun installApk(name: String?): String {

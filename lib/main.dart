@@ -60,7 +60,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   /// Al volver a primer plano: comprobar versión (silencioso, con límite de 15 min).
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.resumed) { repo.updater.onResume(); repo.auto.onResume(); }
+    if (s == AppLifecycleState.resumed) { repo.updater.onResume(); repo.auto.onResume(); repo.checkActivity(); }
     else if (s == AppLifecycleState.paused) { repo.auto.onPause(); }
   }
   @override

@@ -18,7 +18,16 @@ const kMaxApkBytes = 200 * 1024 * 1024;
 
 class UpdateInfo {
   final int build; final String url; final int size;
-  const UpdateInfo(this.build, this.url, this.size);
+  /// MD5 anunciado en el cuerpo de la release ("md5: <32 hex>", en minúsculas); null si la release no lo trae.
+  final String? md5;
+  const UpdateInfo(this.build, this.url, this.size, {this.md5});
+}
+
+/// Línea parseable del cuerpo de la release: "md5: <32 hexadecimales>". null si falta o está mal formada.
+String? parseMd5(String? body) {
+  if (body == null) return null;
+  final m = RegExp(r'^\s*md5:\s*([0-9a-fA-F]{32})\s*$', multiLine: true, caseSensitive: false).firstMatch(body);
+  return m?.group(1)!.toLowerCase();
 }
 
 /// Línea parseable del cuerpo de la release: "build: N".
@@ -41,7 +50,7 @@ UpdateInfo? parseRelease(dynamic j) {
     if (a is Map && a['name'] == kApkAsset && a['browser_download_url'] is String) {
       final u = Uri.tryParse(a['browser_download_url'] as String); final s = a['size'];
       if (u == null || !allowedUri(u) || s is! int || s < 1000000 || s > kMaxApkBytes) return null;
-      return UpdateInfo(build, u.toString(), s);
+      return UpdateInfo(build, u.toString(), s, md5: parseMd5(j['body'] is String ? j['body'] as String : null));
     }
   }
   return null;
@@ -93,7 +102,7 @@ class Updater extends ChangeNotifier {
       final p = await _m.invokeMethod<Map>('getPrefs') ?? {};
       final sk = p['updSkip']; if (sk is int && sk > 0) skippedBuild = sk;
       final mins = p['updChk']; if (mins is int && mins > 0) lastCheck = DateTime.fromMillisecondsSinceEpoch(mins * 60000);
-      await _m.invokeMethod('cleanUpdates'); // un APK de una descarga anterior no debe quedarse en la cache
+      await _m.invokeMethod('cleanUpdates'); // borra lo ya instalado, lo inválido y las descargas a medias; conserva un APK nuevo aún sin instalar
     } catch (_) {}
     notifyListeners();
     if (installed != null && shouldCheck(clock(), lastCheck)) unawaited(check(silent: true));
@@ -165,9 +174,20 @@ class Updater extends ChangeNotifier {
     try {
       final dir = await _m.invokeMethod<String>('updateDir'); if (dir == null) throw const FormatException('sin carpeta');
       part = File('$dir/vigor-update.apk.part'); final fin = File('$dir/vigor-update.apk');
-      if (await part.exists()) await part.delete(); if (await fin.exists()) await fin.delete();
-      await download(Uri.parse(i.url), part, i.size, (p) { progress = p; notifyListeners(); }, () => _cancel);
-      await part.rename(fin.path);
+      // Si ya hay un APK igual o más nuevo descargado y sin instalar, se reutiliza: no se vuelve a descargar.
+      final pend = await _m.invokeMethod<Map>('pendingUpdate');
+      // Debe coincidir el tamaño y, si la release anuncia MD5, también el MD5 (sin MD5 anunciado basta que la versión no sea anterior).
+      final sameSize = pend != null && (pend['size'] as num?)?.toInt() == i.size;
+      final reuse = sameSize && (i.md5 != null ? (pend['md5'] as String?)?.toLowerCase() == i.md5 : ((pend['code'] as num?) ?? 0) >= i.build);
+      if (!reuse) {
+        if (await part.exists()) await part.delete(); if (await fin.exists()) await fin.delete();
+        await download(Uri.parse(i.url), part, i.size, (p) { progress = p; notifyListeners(); }, () => _cancel);
+        await part.rename(fin.path);
+        if (i.md5 != null) {
+          final got = (await _m.invokeMethod<String>('fileMd5', {'name': 'vigor-update.apk'}))?.toLowerCase();
+          if (got != i.md5) { try { await fin.delete(); } catch (_) {} throw const FormatException('La descarga está dañada (el MD5 no coincide con el anunciado). Inténtalo de nuevo.'); }
+        }
+      }
       final r = await _m.invokeMethod<String>('installApk', {'name': 'vigor-update.apk'});
       if (r == 'needsPermission') { state = UpdateState.needsPermission; message = 'Permite instalar desde Vigor en la pantalla que se ha abierto y vuelve a pulsar Actualizar.'; }
       else { state = UpdateState.ready; message = 'Confirma la instalación en la pantalla del sistema.'; }

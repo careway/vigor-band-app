@@ -438,6 +438,8 @@ object BandClient {
      * Si la app se cerro (o se perdio la conexion) con una actividad en marcha, la pulsera sigue con ella: al conectar se le pregunta el estado y, si esta
      * «ocupada», se retoma el sondeo con el tipo que indica. El primer informe hace que la app muestre otra vez la actividad en curso.
      */
+    /** Al abrir la app (o volver a ella) con la pulsera ya conectada: pregunta si hay una actividad en marcha para mostrarla sin tener que iniciar otra. */
+    fun checkRunningSport() = main.post { if (connected && pollType == null) resumeRunningSport() }
     private fun resumeRunningSport() {
         try {
             mgr.readSportModelState(noop, object : ISportModelStateListener {

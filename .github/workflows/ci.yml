@@ -68,7 +68,8 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk vigor-latest.apk
           gh release delete latest --cleanup-tag --yes || true
           # La linea "build: N" la lee la app (lib/data/updater.dart, parseBuild). No cambiar el formato sin cambiar el parser.
-          printf 'build: %s\n\nAPK release firmado con la clave de Vigor (si el secreto de firma está configurado). Commit %s.\n' "${{ github.run_number }}" "${GITHUB_SHA::7}" > notes.txt
+          # La linea "md5: <32 hex>" tambien la lee la app (parseMd5): comprueba la descarga y el APK guardado sin instalar.
+          printf 'build: %s\nmd5: %s\n\nAPK release firmado con la clave de Vigor (si el secreto de firma está configurado). Commit %s.\n' "${{ github.run_number }}" "$(md5sum vigor-latest.apk | cut -d' ' -f1)" "${GITHUB_SHA::7}" > notes.txt
           gh release create latest vigor-latest.apk --prerelease --target "$GITHUB_SHA" \
             --title "Última versión (main)" \
             --notes-file notes.txt

@@ -108,6 +108,14 @@ object UpdateRules {
     fun safeName(n: String?) = n != null && NAME.matches(n) && !n.contains("..")
     /** El APK debe ser de este paquete y de una version mayor que la instalada. */
     fun acceptable(ownPkg: String, pkg: String?, installed: Long, candidate: Long) = pkg == ownPkg && candidate > installed
+    /** MD5 en hexadecimal minusculas de unos bytes (para comprobar la descarga contra el que anuncia la release). */
+    fun md5Hex(bytes: ByteArray): String = java.security.MessageDigest.getInstance("MD5").digest(bytes).joinToString("") { "%02x".format(it) }
+    /** MD5 de un fichero leido por bloques (un APK pesa decenas de MB: no se carga entero en memoria). */
+    fun md5Hex(f: java.io.File): String {
+        val md = java.security.MessageDigest.getInstance("MD5"); val buf = ByteArray(64 * 1024)
+        f.inputStream().use { ins -> while (true) { val n = ins.read(buf); if (n < 0) break; md.update(buf, 0, n) } }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
 }
 
 /** Enlaces que la app abre en el navegador: solo https y solo estos sitios (descargas de GitHub y la atribucion de OpenStreetMap). */

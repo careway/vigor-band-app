@@ -268,6 +268,7 @@ class VigorRepo extends ChangeNotifier {
     // Datos que el trabajo de fondo guardó y no pudo enviar a Health Connect (o no llegó a enviar): se envían ahora (opción B de respaldo).
     try { final i = await _m.invokeMethod('syncInfo'); if (i is Map && i['dirty'] == true && health.master) unawaited(_exportThenClear()); } catch (_) {}
     auto.onResume();
+    unawaited(checkActivity());
   }
 
   Future<void> _exportThenClear() async {
@@ -346,6 +347,8 @@ class VigorRepo extends ChangeNotifier {
   Future<bool> _perm(bool scan) async => await _m.invokeMethod<bool>('requestPermissions', {'scan': scan}) ?? false;
   /// Antes de conectar o buscar (solo si lo pide el usuario): si el Bluetooth está apagado, el sistema pregunta si activarlo.
   Future<bool> _ensureBt() async { bool? ok; try { ok = await _m.invokeMethod<bool>('ensureBluetooth'); } catch (_) {} if (ok == false) { _setNotice('Activa el Bluetooth para conectar.'); return false; } return true; }
+  /// Al abrir la app o volver a ella: si la pulsera ya está conectada y tiene una actividad en marcha, se muestra (sin iniciar otra). Sin efecto si no hay conexión (lo comprueba la parte nativa).
+  Future<void> checkActivity() async { try { await _m.invokeMethod('checkActivity'); } catch (_) {} }
   Future<void> connectSaved() async { auto.userHold = false; await _try('No se pudo conectar.', () async { if (savedMac == null || !await _perm(false) || !await _ensureBt()) return; await _m.invokeMethod('connect', {'mac': savedMac, 'pwd': '0000'}); }); }
   Future<void> scan() async { if (!await _perm(true)) { logs.insert(0, 'Faltan permisos (ubicación solo para buscar por primera vez)'); notifyListeners(); return; } if (!await _ensureBt()) return; found.clear(); try { await _m.invokeMethod('startScan'); } catch (e) { logs.insert(0, 'No se pudo buscar: $e'); notifyListeners(); } }
   Future<void> stopScan() => _m.invokeMethod('stopScan');
