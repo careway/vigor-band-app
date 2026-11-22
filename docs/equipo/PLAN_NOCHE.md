@@ -45,3 +45,9 @@ Ola 1 (a la vez, disjuntas): A1-A3, B2/B3 (sin depender de nombres), C1/C2, D1/D
 Ola 2: A4-A7, B1 (tras A1/A2), C3/C4, D3.
 Cada agente corre `flutter analyze` y `flutter test` (via powershell, ver EQUIPO.md); A y B comparten solo los nombres `notice`/`syncError`/`lastSyncOk` (A los define, B los consume).
 Fuera de alcance esta noche (necesitan pulsera o usuario): firma release/`applicationId` (62-63), sueño real, Worker con app cerrada, TalkBack real, modos deportivos, GPS al aire libre.
+
+## Ola 3 (desde QA_005; verificar cada punto en el código antes de arreglar)
+- **A8 (P0, R1):** `_exportThenClear` no debe limpiar la marca `dirty` si `health.run()` no exportó nada (ya en curso, Health Connect no disponible o sin permisos). Test con pasarela falsa.
+- **A9 (P0, R2):** `wipeData` debe cancelar y esperar un `run()` en vuelo; `afterWipe` debe activar la cancelación; el envío no debe volver a guardar datos borrados. Test con `run` en vuelo.
+- **A10 (P1, R3/R5):** `deleteFromHealth` respeta `_running`; si el fin de sync llega sin `ok`, no exportar parcial. R4 (reentrada de `reload`) solo si se demuestra con test.
+- Dependen de que termine la ola 2 en `lib/data/repo.dart` (no editar a la vez).
