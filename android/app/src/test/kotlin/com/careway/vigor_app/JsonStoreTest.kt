@@ -117,4 +117,37 @@ class JsonStoreTest {
         }
         for (k in JsonStore.KINDS) assertEquals("[]", s.all(k))
     }
+
+    @Test fun unreadableFilePutsAreKeptAndMergedOnRetry() {
+        dir().mkdirs()
+        // Un directorio llamado spo2.json hace que readText lance IOException.
+        val f = File(dir(), "spo2.json"); assertTrue(f.mkdirs())
+        val s = JsonStore(dir())
+        s.put("spo2", "2026-03-05 10:00", JSONObject().put("v", 1))
+        assertTrue(s.isUnreadable("spo2"))
+        assertFalse(s.flush("spo2"))
+        assertEquals(1, JSONArray(s.all("spo2")).length()) // el put sigue en memoria
+        // Se "arregla" el fichero: contiene un dato previo.
+        assertTrue(f.deleteRecursively())
+        f.writeText("""{"2026-03-04 10:00":{"_key":"2026-03-04 10:00","v":0}}""")
+        s.put("spo2", "2026-03-06 10:00", JSONObject().put("v", 2))
+        assertFalse(s.isUnreadable("spo2"))
+        assertTrue(s.flush("spo2"))
+        assertEquals(3, JSONArray(JsonStore(dir()).all("spo2")).length())
+    }
+
+    @Test fun olderFlushDoesNotOverwriteNewer() {
+        val s = JsonStore(dir())
+        s.put("sleep", "2026-03-05", JSONObject().put("v", 1))
+        val entered = java.util.concurrent.CountDownLatch(1); val release = java.util.concurrent.CountDownLatch(1)
+        s.beforeWrite = { entered.countDown(); release.await(5, java.util.concurrent.TimeUnit.SECONDS) }
+        val t = Thread { s.flush("sleep") }; t.start()
+        assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        // Con el flush viejo detenido tras serializar, se borra el registro y se vuelca la version nueva.
+        s.beforeWrite = null
+        s.deleteRecords("sleep", listOf("2026-03-05"))
+        release.countDown(); t.join(5000)
+        val txt = File(dir(), "sleep.json").readText()
+        assertFalse(txt.contains("2026-03-05"))
+    }
 }

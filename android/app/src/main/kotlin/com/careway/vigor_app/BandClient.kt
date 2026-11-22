@@ -72,7 +72,9 @@ object BandClient {
     /** fsync fuera del hilo principal: un unico hilo de E/S para vaciar el almacen. */
     private val ioFlush = java.util.concurrent.Executors.newSingleThreadExecutor()
     val ioExec: java.util.concurrent.ExecutorService get() = ioFlush
-    private fun flushAsync(kinds: List<String>, then: () -> Unit) { ioFlush.execute { try { kinds.forEach { store.flush(it) } } catch (_: Throwable) {}; then() } }
+    /** Vuelcos fallidos durante la sincronizacion en curso: si alguno falla, la sincronizacion no cuenta como correcta. */
+    @Volatile private var flushFailures = 0
+    private fun flushAsync(kinds: List<String>, then: () -> Unit) { ioFlush.execute { try { kinds.forEach { if (!store.flush(it)) flushFailures++ } } catch (_: Throwable) { flushFailures++ }; then() } }
     @Volatile private var inited = false
     lateinit var app: Context; private set
     lateinit var store: JsonStore; private set
@@ -292,12 +294,12 @@ object BandClient {
             val blocked = synchronized(store) { if (store.wiping) true else { syncing = true; false } }
             if (blocked) { done?.invoke(); return@post }
             if (!keepHeadless) weConnectedHeadless = false // el usuario (o la app) usa la sesion: el trabajo de fondo no debe cerrarla
-            syncing = true; stageTimeouts = 0; val gen = ++syncGen; emit(mapOf("type" to "sync", "value" to "start"))
+            syncing = true; stageTimeouts = 0; flushFailures = 0; val gen = ++syncGen; emit(mapOf("type" to "sync", "value" to "start"))
             val alive = { gen == syncGen && connected }
             val end: () -> Unit = {
                 if (gen == syncGen) {
                     // Correcta = la conexion aguanto hasta el final y ninguna etapa vencio su tiempo. Solo entonces cuenta como "ultima sincronizacion".
-                    val ok = connected && stageTimeouts == 0
+                    val ok = connected && stageTimeouts == 0 && flushFailures == 0
                     val at = System.currentTimeMillis()
                     if (ok) SyncPrefs.markSynced(app, at, appOpen = listener != null)
                     syncing = false; emit(mapOf("type" to "sync", "value" to "end", "ok" to ok, "at" to at))

@@ -21,6 +21,11 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
     @Volatile var wiping = false; private set
     /** Solo pruebas: se invoca entre la serializacion y la escritura de flush. */
     @Volatile internal var beforeWrite: (() -> Unit)? = null
+    /** Tipos cuyo fichero no se pudo leer (IOException): lo acumulado en memoria espera aqui y se fusiona cuando una relectura funcione. */
+    private val unread = HashSet<String>()
+    /** Version por tipo: se asigna al serializar (bajo el cerrojo del almacen) y se comprueba bajo writeLock para no escribir una version vieja tras una nueva. */
+    private val verCounter = HashMap<String, Long>()
+    private val verWritten = HashMap<String, Long>()
     init { dir.mkdirs(); purgeCorrupt() }
 
     /** N8: los `<kind>.corrupt-<ms>` de mas de 30 dias se eliminan (nunca los de fecha futura/ilegible). */
@@ -48,19 +53,38 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
     /** Un error de E/S (no de formato) NO renombra ni cachea: el fichero bueno se conserva y flush() se niega a sobrescribirlo. */
     @Synchronized private fun load(kind: String): JSONObject {
         require(kind in KINDS) { "tipo desconocido" }
-        cache[kind]?.let { return it }
+        val cached = cache[kind]
+        if (cached != null && kind !in unread) return cached
         val f = File(dir, "$kind.json")
-        val o = if (!f.exists()) JSONObject() else {
-            val text = try { f.readText() } catch (e: IOException) { return JSONObject() }
+        val disk = if (!f.exists()) JSONObject() else {
+            val text = try { f.readText() } catch (e: IOException) {
+                // No legible: se cachea un objeto pendiente para no perder los put; flush se niega hasta poder fusionar.
+                unread.add(kind)
+                return cached ?: JSONObject().also { cache[kind] = it }
+            }
             try { JSONObject(text) } catch (e: org.json.JSONException) {
                 val bad = File(dir, "$kind.corrupt-${now()}")
                 if (!f.renameTo(bad)) try { f.copyTo(bad, overwrite = true) } catch (_: Exception) {}
                 JSONObject()
             }
         }
-        cache[kind] = o
-        return o
+        if (cached != null) { // relectura tras fallo: lo pendiente en memoria manda sobre el disco; los items se concatenan
+            val it = cached.keys()
+            while (it.hasNext()) {
+                val k = it.next(); val p = cached.optJSONObject(k)
+                val d = disk.optJSONObject(k)
+                val pi = p?.optJSONArray("items"); val di = d?.optJSONArray("items")
+                if (p != null && pi != null && di != null) { for (i in 0 until pi.length()) di.put(pi.get(i)); disk.put(k, d) }
+                else disk.put(k, cached.get(k))
+            }
+        }
+        unread.remove(kind)
+        cache[kind] = disk
+        return disk
     }
+
+    /** true si el fichero del tipo no pudo leerse y hay datos pendientes sin volcar. */
+    @Synchronized fun isUnreadable(kind: String): Boolean { if (kind in KINDS) load(kind); return kind in unread }
 
     @Synchronized fun put(kind: String, key: String, v: JSONObject) { if (isDead(kind, key)) return; v.put("_key", key); load(kind).put(key, v) }
 
@@ -111,23 +135,27 @@ class JsonStore(private val dir: File, private val now: () -> Long = { System.cu
     /** Serializa bajo el cerrojo del almacen; la escritura con fsync ocurre fuera de el (no bloquea a los callbacks del SDK). */
     fun flush(kind: String): Boolean {
         if (kind !in KINDS) return false
-        var g = 0L
+        var g = 0L; var ver = 0L
         val data = synchronized(this) {
             if (wiping) return false
             g = gen
             val o = load(kind)
-            if (!cache.containsKey(kind)) return false // lectura fallida: no se sobrescribe el fichero existente
+            if (kind in unread) return false // lectura fallida: no se sobrescribe el fichero existente; los datos siguen en memoria
             prune(kind)
             if (kind == "tomb" && o.optJSONObject("state") == null) return true // sin tumbas no se crea fichero
+            ver = (verCounter[kind] ?: 0L) + 1; verCounter[kind] = ver
             o.toString()
         }
         beforeWrite?.invoke()
         synchronized(writeLock) {
             if (gen != g) return false // H1: hubo un wipe despues de serializar: se descarta
+            if (ver <= (verWritten[kind] ?: 0L)) return true // ya se escribio una version posterior (mas reciente): no se pisa con la vieja
             val target = File(dir, "$kind.json"); val tmp = File(dir, "$kind.tmp")
             return try {
                 FileOutputStream(tmp).use { it.write(data.toByteArray(Charsets.UTF_8)); it.fd.sync() }
-                if (!tmp.renameTo(target)) { tmp.delete(); false } else true
+                // Files.move atomico: reemplaza el destino tambien en Windows (File.renameTo no lo hace); en Android equivale al rename(2) de siempre.
+                try { java.nio.file.Files.move(tmp.toPath(), target.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE) } catch (e: IOException) { tmp.delete(); return false }
+                verWritten[kind] = ver; true
             } catch (e: Exception) { tmp.delete(); false }
         }
     }

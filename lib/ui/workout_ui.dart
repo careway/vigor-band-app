@@ -63,12 +63,19 @@ class WorkoutPage extends StatelessWidget {
         final w = repo.workout; final c = VC.of(context); final m = w.mode; final col = m == null ? c.accent : groupColor(c, m.group);
         return Scaffold(
           appBar: AppBar(title: Text(m?.name ?? 'Entreno')),
-          body: _Tick(w, (context) => ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x8), children: [
+          body: ListView(padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x8), children: [
             Panel(child: Column(children: [
-              Semantics(liveRegion: true, container: true, label: 'Tiempo ${clockText(w.elapsed())}. ${w.active ? _stateText(w) : 'Actividad terminada'}', child: ExcludeSemantics(child: Column(children: [
-                Text(clockText(w.elapsed()), style: VT.display(c).copyWith(fontSize: 64, color: w.active ? c.text : c.muted)),
-                Text(w.active ? _stateText(w) : 'Actividad terminada', style: VT.caption(c).copyWith(color: w.active && !w.stale && !w.paused ? col : c.muted, fontWeight: FontWeight.w700)),
-              ]))),
+              // Solo esto se reconstruye cada segundo; el resto de la pantalla (mapa, gráfica, tiles) cambia con los datos de la pulsera.
+              _Tick(w, (context) {
+                final state = w.active ? _stateText(w) : 'Actividad terminada';
+                return Column(children: [
+                  Semantics(container: true, label: 'Tiempo ${clockText(w.elapsed())}', child: ExcludeSemantics(child:
+                    Text(clockText(w.elapsed()), style: VT.display(c).copyWith(fontSize: 64, color: w.active ? c.text : c.muted)))),
+                  // Solo el estado (cambia pocas veces) se anuncia solo; el tiempo cambia cada segundo y no debe anunciarse.
+                  Semantics(liveRegion: true, container: true, label: state, child: ExcludeSemantics(child:
+                    Text(state, style: VT.caption(c).copyWith(color: w.active && !w.stale && !w.paused ? col : c.muted, fontWeight: FontWeight.w700)))),
+                ]);
+              }),
             ])),
             if (workoutFields(m).contains(WorkoutField.gps)) _LiveMapCard(repo, w),
             LayoutBuilder(builder: (context, bc) {
@@ -84,7 +91,7 @@ class WorkoutPage extends StatelessWidget {
             if (w.active) Row(children: [
               Expanded(child: FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 52), backgroundColor: c.danger, foregroundColor: Colors.white), onPressed: () => _finish(context, repo), icon: const Icon(Icons.stop), label: Text(repo.conn == 'connected' ? 'Terminar' : 'Quitar de la pantalla'))),
             ]) else FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size(48, 52)), onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.check), label: const Text('Cerrar')),
-          ])),
+          ]),
         );
       });
 
@@ -98,10 +105,14 @@ class WorkoutPage extends StatelessWidget {
 
 /// Mapa de la actividad de recorrido con la última posición que devolvió la pulsera y un círculo con su incertidumbre aproximada. La pulsera no
 /// informa de la posición en directo: llega al sincronizar, de modo que «Actualizar posición» lee lo grabado hasta ahora (experimental).
+@visibleForTesting
+int debugLiveMapBuilds = 0;
+
 class _LiveMapCard extends StatelessWidget {
   final VigorRepo repo; final LiveWorkout w; const _LiveMapCard(this.repo, this.w);
   @override
   Widget build(BuildContext context) {
+    debugLiveMapBuilds++;
     final c = VC.of(context); final pos = w.position; final u = w.uncertaintyM; final age = w.positionAgeSec;
     final canUpdate = w.active && repo.conn == 'connected' && !repo.syncing;
     return Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
