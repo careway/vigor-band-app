@@ -75,6 +75,9 @@ String _d(DateTime t) => '${t.year.toString().padLeft(4, '0')}-${t.month.toStrin
 class VigorRepo extends ChangeNotifier {
   static const _m = MethodChannel('vigor/methods');
   static const _e = EventChannel('vigor/events');
+  /// [healthGateway]: solo para tests; por defecto la pasarela real de la plataforma.
+  VigorRepo({HealthGateway? healthGateway}) : _healthGateway = healthGateway;
+  final HealthGateway? _healthGateway;
 
   String conn = 'idle'; // idle|scanning|connecting|connected|disconnected
   int? battery; bool charging = false;
@@ -150,7 +153,7 @@ class VigorRepo extends ChangeNotifier {
   late final heart = HeartMeter(start: () => _m.invokeMethod('startHeart'), stop: () => _m.invokeMethod('stopHeart'), isConnected: () => conn == 'connected');
   final updater = Updater();
   /// Sincronización opcional con Health Connect / Apple Salud (solo escribe; apagada de serie). Ver health_sync.dart.
-  late final health = HealthSync(gateway: PlatformHealthGateway(),
+  late final health = HealthSync(gateway: _healthGateway ?? PlatformHealthGateway(),
       savePref: (k, v) => _m.invokeMethod('setPref', {'key': k, 'value': v}),
       loadLedger: () => _m.invokeMethod<String>('healthLoad'),
       saveLedger: (j) async => await _m.invokeMethod<bool>('healthSave', {'json': j}) ?? false)

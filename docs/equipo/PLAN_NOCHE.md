@@ -55,3 +55,7 @@ Fuera de alcance esta noche (necesitan pulsera o usuario): firma release/`applic
 ## Estado (2026-11-22, madrugada)
 - Olas 1, 2 y 3 hechas y subidas (R1, R2, R3 y R5 de QA_005 arreglados; R4 sin demostrar, descartado). Analisis limpio y 553 tests verdes.
 - Pendiente: D3 (manual de usuario); test de wipeData/_exportThenClear a nivel de VigorRepo (hace falta poder inyectar la pasarela de Health Connect); todo lo que requiere pulsera sigue SIN verificar.
+
+## Estado (2026-11-22, 04:00)
+- D3 (manual) hecho; VigorRepo admite inyectar la pasarela de Health Connect y hay tests de wipeData/_exportThenClear (sin fallos nuevos). Analisis limpio y 558 tests verdes.
+- Plan agotado salvo lo que necesita pulsera (sin verificar). La proxima ronda pedira una auditoria nueva al supervisor solo si hay algo valioso; no se inventa trabajo.
