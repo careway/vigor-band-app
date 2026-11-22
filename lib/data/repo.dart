@@ -355,7 +355,10 @@ class VigorRepo extends ChangeNotifier {
   Future<void> connect(String mac) async { auto.userHold = false; await _try('No se pudo conectar.', () async { if (!await _ensureBt()) return; await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }); }
   Future<void> disconnect() { auto.userHold = true; return _try('No se pudo desconectar.', () => _m.invokeMethod('disconnect')); }
   Future<void> sync() => _try('No se pudo sincronizar.', () => _m.invokeMethod('sync'));
+  /// Ubicación para la ayuda de GPS de la pulsera: se pide al iniciar una actividad y, si se deniega, la actividad sigue (sin ayuda de posición).
+  Future<void> _locationForGps() async { try { await _m.invokeMethod<bool>('requestPermissions', {'scan': false, 'location': true}); } catch (_) {} }
   Future<void> startSport(String t) async {
+    await _locationForGps();
     sportActive = true; workout.begin(sportByKey(t)); notifyListeners();
     if (!await _try('No se pudo iniciar la actividad.', () => _m.invokeMethod('startSport', {'type': t}))) {
       _workoutWasActive = false; // revertir sin disparar la sincronización de fin de actividad

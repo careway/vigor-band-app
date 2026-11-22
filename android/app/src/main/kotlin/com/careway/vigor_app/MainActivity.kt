@@ -92,7 +92,8 @@ class MainActivity : FlutterFragmentActivity() {
                 when (call.method) {
                     "requestPermissions" -> {
                         val scan = call.argument<Boolean>("scan") ?: true
-                        val p = if (Build.VERSION.SDK_INT >= 31)
+                        val p = if (call.argument<Boolean>("location") == true) arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        else if (Build.VERSION.SDK_INT >= 31)
                             (if (scan) arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT) else arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
                         else if (scan) arrayOf(Manifest.permission.ACCESS_FINE_LOCATION) else emptyArray()
                         val missing = p.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
