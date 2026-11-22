@@ -115,3 +115,13 @@ object OpenUrlRules {
     private val HOSTS = setOf("github.com", "www.openstreetmap.org")
     fun allowed(scheme: String?, host: String?) = scheme == "https" && host != null && host in HOSTS
 }
+
+/** Servicio estandar Heart Rate (0x180D) de Bluetooth: formato de la caracteristica Heart Rate Measurement (0x2A37). Sin Android; probado con JUnit. */
+object HeartRateWire {
+    /** Mismo rango que HeartRules: fuera de el no se publica nada (otras apps no deben recibir basura). */
+    fun valid(bpm: Int) = HeartRules.valid(bpm)
+    /** Banderas 0x00 = pulso en uint8, sin contacto ni energia ni RR. */
+    fun encode(bpm: Int): ByteArray? = if (!valid(bpm)) null else byteArrayOf(0x00, bpm.toByte())
+    /** Body Sensor Location (0x2A38): 2 = muneca. */
+    val WRIST = byteArrayOf(0x02)
+}

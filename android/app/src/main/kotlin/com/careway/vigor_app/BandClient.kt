@@ -401,6 +401,7 @@ object BandClient {
         try {
             val j = toJson(d); if (debuggable) { log("deporte-vivo $j"); DebugTools.appendLive(j) }
             emit(mapOf("type" to "sportLive", "data" to j.toMap()))
+            if (HeartRateBroadcaster.active) { val hr = j.optInt("heartRate", 0); if (HeartRateWire.valid(hr)) HeartRateBroadcaster.publish(hr) }
             val st = j.optString("runState"); val op = j.optString("opCode")
             if (op == "STOP" || st == "FINISHED") pollStop()
             else if ((st == "RUNNING" || st == "RESUMING" || st == "PAUSED") && pollType == null) { try { pollStart(ESportType.valueOf(j.optString("sportType"))) } catch (_: Throwable) {} }
@@ -429,8 +430,9 @@ object BandClient {
             try { val j = toJson(d); if (debuggable) { log("gps-vivo (recibido)"); DebugTools.appendGps(j) }; emit(mapOf("type" to "gpsLive", "data" to j.toMap())) } catch (_: Throwable) {}
         }
     }
-    fun pollStart(t: ESportType) { if (pollType == t) return; pollType = t; pollFails = 0; main.removeCallbacks(pollTick); main.postDelayed(pollTick, 2500); try { mgr.setReportGps(noop, true, gpsLiveListener) } catch (_: Throwable) {} }
-    fun pollStop() { val was = pollType; pollType = null; main.removeCallbacks(pollTick); if (was != null) { try { mgr.setReportGps(noop, false, gpsLiveListener) } catch (_: Throwable) {} } }
+    fun hrShareEnabled(): Boolean = try { app.getSharedPreferences("vigor_prefs", Context.MODE_PRIVATE).getBoolean("hrShare", false) } catch (_: Throwable) { false }
+    fun pollStart(t: ESportType) { if (pollType == t) return; pollType = t; if (hrShareEnabled()) { val ok = HeartRateBroadcaster.start(app); emit(mapOf("type" to "hrShare", "on" to ok, "error" to HeartRateBroadcaster.lastError)) }; pollFails = 0; main.removeCallbacks(pollTick); main.postDelayed(pollTick, 2500); try { mgr.setReportGps(noop, true, gpsLiveListener) } catch (_: Throwable) {} }
+    fun pollStop() { val was = pollType; pollType = null; if (HeartRateBroadcaster.active) { HeartRateBroadcaster.stop(); emit(mapOf("type" to "hrShare", "on" to false, "error" to null)) }; main.removeCallbacks(pollTick); if (was != null) { try { mgr.setReportGps(noop, false, gpsLiveListener) } catch (_: Throwable) {} } }
     private fun JSONObject.toMap(): Map<String, Any?> { val o = HashMap<String, Any?>(); val it = keys(); while (it.hasNext()) { val k = it.next(); val v = opt(k); o[k] = if (v == JSONObject.NULL) null else v }; return o }
     /**
      * Si la app se cerro (o se perdio la conexion) con una actividad en marcha, la pulsera sigue con ella: al conectar se le pregunta el estado y, si esta

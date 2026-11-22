@@ -32,6 +32,13 @@ class MainActivity : FlutterFragmentActivity() {
     private val mgr get() = VPOperateManager.getInstance()
     private val prefs get() = getSharedPreferences("vigor", MODE_PRIVATE)
 
+    private var btPending: MethodChannel.Result? = null
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 78) { val r = btPending; btPending = null; try { r?.success(resultCode == android.app.Activity.RESULT_OK) } catch (_: Throwable) {} }
+    }
+
     override fun onRequestPermissionsResult(rc: Int, perms: Array<out String>, res: IntArray) {
         super.onRequestPermissionsResult(rc, perms, res)
         if (rc == 77) {
@@ -82,6 +89,17 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success(mapOf(
                             "missing" to StartupPermissions.missing(Build.VERSION.SDK_INT, granted).map { it.wire },
                             "blocked" to StartupPermissions.blocked(Build.VERSION.SDK_INT, asked, granted) { x -> shouldShowRequestPermissionRationale(x) }))
+                    }
+                    "ensureBluetooth" -> {
+                        val ad = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+                        if (ad == null) result.success(false)
+                        else if (ad.isEnabled) result.success(true)
+                        else if (btPending != null) result.success(false)
+                        else {
+                            btPending = result
+                            try { startActivityForResult(Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE), 78) }
+                            catch (_: Throwable) { btPending = null; result.success(false) }
+                        }
                     }
                     "startScan" -> { startScan(); result.success(null) }
                     "stopScan" -> { mgr.stopScanDevice(); result.success(null) }
@@ -146,6 +164,16 @@ class MainActivity : FlutterFragmentActivity() {
                             val ok = try { BandClient.store.saveHealthState(txt ?: "") } catch (e: Throwable) { false }
                             runOnUiThread { try { result.success(ok) } catch (_: Throwable) {} }
                         }
+                    }
+                    "hrShareGet" -> result.success(BandClient.hrShareEnabled())
+                    "hrShareSet" -> {
+                        val on = call.argument<Boolean>("on") ?: false
+                        getSharedPreferences("vigor_prefs", MODE_PRIVATE).edit().putBoolean("hrShare", on).apply()
+                        if (!on) HeartRateBroadcaster.stop()
+                        if (on && Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
+                            val ask = permQueue.add(result, listOf(Manifest.permission.BLUETOOTH_ADVERTISE)); if (ask != null) askPermissions(ask)
+                            permQueue.drainLate().forEach { (r, ok) -> try { r.success(ok) } catch (_: Throwable) {} }
+                        } else result.success(true)
                     }
                     "startHeart" -> { BandClient.startHeart(); result.success(null) }
                     "stopHeart" -> { BandClient.stopHeart(); result.success(null) }

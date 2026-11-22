@@ -180,6 +180,12 @@ class _MeasurementsPageState extends State<MeasurementsPage> {
         ],
         const Align(alignment: Alignment.centerRight, child: InfoButton('Pulso en vivo', 'Cada medición enciende el sensor óptico unos segundos: medir a menudo gasta batería de la pulsera. Solo funciona con la app abierta en Hoy y la pulsera conectada; se detiene al sincronizar, durante un deporte y con la batería de la pulsera por debajo del 20 %. Función implementada pero no probada con la pulsera.')),
       ])),
+      Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Compartir pulso en actividades', style: VT.heading(c)),
+          subtitle: Text(r.hrShare ? 'Activado' : 'Desactivado', style: VT.caption(c)),
+          value: r.hrShare, onChanged: (v) => r.setHrShare(v)),
+        const Align(alignment: Alignment.centerRight, child: InfoButton('Compartir pulso', 'Mientras haces una actividad, el móvil se anuncia por Bluetooth como un sensor de pulso estándar y otras apps (Strava, etc.) pueden leerlo como si fuera una banda de pecho: búscalo en esa app como sensor «Heart Rate». Solo emite durante la actividad y mientras esta opción esté activada; cualquier móvil cercano podría leerlo. Función implementada pero no probada con otra app ni con la pulsera.')),
+      ])),
       const SectionHeader('Experimentales'),
       Panel(child: SwitchListTile(contentPadding: EdgeInsets.zero, title: Text('Mostrar métricas experimentales', style: VT.body(c)),
         subtitle: Text('Glucosa y análisis de sangre estimados.', style: VT.caption(c)),

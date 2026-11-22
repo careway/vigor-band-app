@@ -192,6 +192,14 @@ class VigorRepo extends ChangeNotifier {
     }
   }
   bool liveOn = true; int liveSec = 10;
+  /// Publicar el pulso de una actividad como sensor Bluetooth de pulso (Strava y similares). Desactivado por defecto: quien esté cerca podría leerlo.
+  bool hrShare = false;
+  Future<void> setHrShare(bool v) async {
+    bool? ok;
+    if (!await _try('No se pudo guardar.', () async { ok = await _m.invokeMethod<bool>('hrShareSet', {'on': v}); })) return;
+    if (v && ok != true) { try { await _m.invokeMethod('hrShareSet', {'on': false}); } catch (_) {} _setNotice('Falta el permiso de Bluetooth.'); return; }
+    hrShare = v; notifyListeners();
+  }
   /// Mapa de fondo de OpenStreetMap en las rutas (descarga teselas de openstreetmap.org; apagado = solo la ruta dibujada).
   bool mapOn = true;
   /// Aspecto del mapa (ver [MapStyle]); por defecto, el moderno.
@@ -245,6 +253,7 @@ class VigorRepo extends ChangeNotifier {
       showExperimental = p['exp'] == 1;
       mapOn = p['mapOn'] != 0; mapStyle = MapStyle.fromIndex(p['mapStyle']); liveOn = p['liveOn'] != 0; final ls = p['liveSec']; liveSec = ls is int && LiveHeart.allowedIntervals.contains(ls) ? ls : 10;
       live.setEnabled(liveOn); live.setInterval(liveSec);
+      try { hrShare = (await _m.invokeMethod('hrShareGet')) == true; } catch (_) {}
       themeMode = ((p['theme'] as num?)?.toInt() ?? 0).clamp(0, 2);
       healthPrefs = Map<dynamic, dynamic>.from(p);
     } catch (e) { loadError = 'preferencias: ${e.runtimeType}'; }
@@ -335,10 +344,12 @@ class VigorRepo extends ChangeNotifier {
   Future<void> debugClearDumps() => _m.invokeMethod('debugClearDumps');
 
   Future<bool> _perm(bool scan) async => await _m.invokeMethod<bool>('requestPermissions', {'scan': scan}) ?? false;
-  Future<void> connectSaved() async { auto.userHold = false; await _try('No se pudo conectar.', () async { if (savedMac == null || !await _perm(false)) return; await _m.invokeMethod('connect', {'mac': savedMac, 'pwd': '0000'}); }); }
-  Future<void> scan() async { if (!await _perm(true)) { logs.insert(0, 'Faltan permisos (ubicación solo para buscar por primera vez)'); notifyListeners(); return; } found.clear(); try { await _m.invokeMethod('startScan'); } catch (e) { logs.insert(0, 'No se pudo buscar: $e'); notifyListeners(); } }
+  /// Antes de conectar o buscar (solo si lo pide el usuario): si el Bluetooth está apagado, el sistema pregunta si activarlo.
+  Future<bool> _ensureBt() async { bool? ok; try { ok = await _m.invokeMethod<bool>('ensureBluetooth'); } catch (_) {} if (ok == false) { _setNotice('Activa el Bluetooth para conectar.'); return false; } return true; }
+  Future<void> connectSaved() async { auto.userHold = false; await _try('No se pudo conectar.', () async { if (savedMac == null || !await _perm(false) || !await _ensureBt()) return; await _m.invokeMethod('connect', {'mac': savedMac, 'pwd': '0000'}); }); }
+  Future<void> scan() async { if (!await _perm(true)) { logs.insert(0, 'Faltan permisos (ubicación solo para buscar por primera vez)'); notifyListeners(); return; } if (!await _ensureBt()) return; found.clear(); try { await _m.invokeMethod('startScan'); } catch (e) { logs.insert(0, 'No se pudo buscar: $e'); notifyListeners(); } }
   Future<void> stopScan() => _m.invokeMethod('stopScan');
-  Future<void> connect(String mac) async { auto.userHold = false; await _try('No se pudo conectar.', () async { await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }); }
+  Future<void> connect(String mac) async { auto.userHold = false; await _try('No se pudo conectar.', () async { if (!await _ensureBt()) return; await stopScan(); await _m.invokeMethod('connect', {'mac': mac, 'pwd': '0000'}); }); }
   Future<void> disconnect() { auto.userHold = true; return _try('No se pudo desconectar.', () => _m.invokeMethod('disconnect')); }
   Future<void> sync() => _try('No se pudo sincronizar.', () => _m.invokeMethod('sync'));
   Future<void> startSport(String t) async {
