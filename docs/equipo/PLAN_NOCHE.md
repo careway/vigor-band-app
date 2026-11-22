@@ -80,3 +80,6 @@ Revisados BandClient.kt (syncAll/stage/runSessionBlocking/poll), SyncWorker.kt, 
 ## Ronda 05:00
 - P2 (ruta de un entreno largo) medido con un test sintetico de 4 h (2880 puntos): peor punto 4,7 ms en el PC, 3,5 s en total. No se cambia nada; queda el test test/dev031 como proteccion. En el movil sera mas lento (sin medir).
 - Sin mas trabajo valioso detectado sin pulsera ni usuario: no se inventa mas. Lo pendiente depende de la pulsera (ver docs/ESTADO.md).
+
+## Ronda siguiente
+- Sin cambios: repo limpio, sin trabajo valioso sin pulsera ni usuario.
