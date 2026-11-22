@@ -77,6 +77,7 @@ class DevicePage extends StatelessWidget {
         ]),
         if (r.syncing) ...[const SizedBox(height: Sp.x3), LinearProgressIndicator(value: r.progress > 0 && r.progress < 1 ? r.progress : null), const Note('Sincronizando…')]
         else if (r.lastSync != null) Note('${syncAgoText(r.lastSync, r.clock())} (${hm(r.lastSync!)})'),
+        StatusLine(syncError: r.syncError, notice: r.notice),
         const SizedBox(height: Sp.x3),
         Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
           if (!ok && r.savedMac != null) FilledButton(onPressed: r.connectSaved, child: const Text('Conectar')),

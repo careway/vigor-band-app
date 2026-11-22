@@ -49,6 +49,7 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
     final steps = isLast && isToday && r.liveSteps > d.steps ? r.liveSteps : d.steps;
     return RefreshIndicator(onRefresh: () async { await r.sync(); }, child: ListView(physics: lock ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, 120), children: [
       Semantics(liveRegion: false, child: Text(r.syncing ? 'Sincronizando…' : syncAgoText(r.lastSync, r.clock()), style: VT.caption(c))),
+      StatusLine(syncError: r.syncError, notice: r.notice),
       const SizedBox(height: Sp.x3),
       _ribbon(c, r, keys, k),
       const SizedBox(height: Sp.x3),

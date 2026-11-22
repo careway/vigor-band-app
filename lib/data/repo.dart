@@ -119,7 +119,7 @@ class VigorRepo extends ChangeNotifier {
   bool showExperimental = false;
   /// 0 oscuro (principal), 1 claro, 2 sistema.
   int themeMode = 0;
-  Future<void> setThemeMode(int v) async { themeMode = v.clamp(0, 2); await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'theme', 'value': themeMode})); notifyListeners(); }
+  Future<void> setThemeMode(int v) async { final n = v.clamp(0, 2); if (!await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'theme', 'value': n}))) return; themeMode = n; notifyListeners(); }
   DateTime Function() clock = DateTime.now;
   StreamSubscription? _sub;
   /// Sincronización automática (DEV_012). Ajustes guardados en Kotlin (vigor_sync): interruptor, intervalo, «solo con pantalla encendida» y exportación sin la app.
@@ -142,7 +142,7 @@ class VigorRepo extends ChangeNotifier {
   Future<void> setAutoSync({bool? enabled, int? minutes, bool? screenOnlyOnly, bool? bgExportOn}) async {
     try {
       _readSyncInfo(await _m.invokeMethod('setAutoSync', {'enabled': ?enabled, 'minutes': ?(minutes == null ? null : safeAutoMin(minutes)), 'screenOnly': ?screenOnlyOnly, 'bgExport': ?bgExportOn}));
-    } catch (_) {}
+    } catch (_) { if (!_disposed) _setNotice('No se pudo guardar.'); return; }
     if (enabled != null) auto.setEnabled(enabled);
     notifyListeners();
   }
@@ -178,7 +178,7 @@ class VigorRepo extends ChangeNotifier {
   List<int> postWorkoutSyncDelays = const [6, 45];
   final List<Timer> _postWorkoutTimers = [];
   /// Al terminar una actividad (desde la app o la pulsera) se sincroniza solo, para que aparezca en el historial sin pulsar nada.
-  bool _syncOnReconnect = false;
+  bool _syncOnReconnect = false, _wasDisconnected = false;
   void _syncAfterWorkout() {
     if (conn != 'connected') { _syncOnReconnect = true; return; } // sin conexion: se sincroniza al reconectar
     _syncOnReconnect = false;
@@ -193,10 +193,10 @@ class VigorRepo extends ChangeNotifier {
   bool mapOn = true;
   /// Aspecto del mapa (ver [MapStyle]); por defecto, el moderno.
   MapStyle mapStyle = MapStyle.byDefault;
-  Future<void> setMapStyle(MapStyle v) async { mapStyle = v; await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'mapStyle', 'value': v.index})); notifyListeners(); }
-  Future<void> setMapOn(bool v) async { mapOn = v; await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'mapOn', 'value': v ? 1 : 0})); notifyListeners(); }
-  Future<void> setLiveOn(bool v) async { liveOn = v; live.setEnabled(v); await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'liveOn', 'value': v ? 1 : 0})); notifyListeners(); }
-  Future<void> setLiveSec(int v) async { if (!LiveHeart.allowedIntervals.contains(v)) return; liveSec = v; live.setInterval(v); await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'liveSec', 'value': v})); notifyListeners(); }
+  Future<void> setMapStyle(MapStyle v) async { if (!await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'mapStyle', 'value': v.index}))) return; mapStyle = v; notifyListeners(); }
+  Future<void> setMapOn(bool v) async { if (!await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'mapOn', 'value': v ? 1 : 0}))) return; mapOn = v; notifyListeners(); }
+  Future<void> setLiveOn(bool v) async { if (!await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'liveOn', 'value': v ? 1 : 0}))) return; liveOn = v; live.setEnabled(v); notifyListeners(); }
+  Future<void> setLiveSec(int v) async { if (!LiveHeart.allowedIntervals.contains(v)) return; if (!await _try('No se pudo guardar.', () => _m.invokeMethod('setPref', {'key': 'liveSec', 'value': v}))) return; liveSec = v; live.setInterval(v); notifyListeners(); }
 
   final Completer<void> _ready = Completer<void>();
   /// Se completa cuando las preferencias, los datos y Health Connect están cargados (antes de conectar con la pulsera).
@@ -264,7 +264,7 @@ class VigorRepo extends ChangeNotifier {
   }
 
   @override
-  void dispose() { _disposed = true; for (final t in _postWorkoutTimers) { t.cancel(); } _noticeTimer?.cancel(); _syncWatchdogTimer?.cancel(); _sub?.cancel(); auto.dispose(); live.dispose(); heart.dispose(); updater.dispose(); health.dispose(); super.dispose(); }
+  void dispose() { _disposed = true; for (final t in _postWorkoutTimers) { t.cancel(); } _noticeTimer?.cancel(); _syncWatchdogTimer?.cancel(); _autoMeasureTimer?.cancel(); _sub?.cancel(); auto.dispose(); live.dispose(); heart.dispose(); updater.dispose(); health.dispose(); super.dispose(); }
 
   void _onEvent(dynamic ev) {
     if (ev is! Map) return;
@@ -280,6 +280,8 @@ class VigorRepo extends ChangeNotifier {
       case 'state':
         conn = m['value']; if (conn != 'connected' && syncing) { syncing = false; _syncWatchdogTimer?.cancel(); _failSync(); }
         if (conn == 'connected' && _syncOnReconnect) _syncAfterWorkout();
+        if (conn == 'connected' && _wasDisconnected) unawaited(readAutoMeasure());
+        _wasDisconnected = conn == 'disconnected';
         if (conn != 'connected') { heart.cancel(); sportActive = false; live.clearLowBattery(); }
         if (conn == 'connected') { _m.invokeMethod<String>('savedMac').then((v) { savedMac = v; notifyListeners(); }, onError: (_) {}); }
       case 'battery': final pc = m['percent']; if (pc is num) battery = pc.toInt(); charging = m['charging'] == true;
@@ -299,7 +301,7 @@ class VigorRepo extends ChangeNotifier {
         autoUnsupported = m['unsupported'] == true;
         final it = m['items'];
         if (it is List) autoMeasures = [for (final e in it) if (e is Map) AutoMeasure.fromMap(e)];
-      case 'autoMeasureResult': autoMsg = m['ok'] == true ? 'Ajuste enviado a la pulsera.' : (m['msg']?.toString() ?? 'La pulsera no aceptó el ajuste.'); if (m['ok'] == true) readAutoMeasure();
+      case 'autoMeasureResult': _autoMeasureTimer?.cancel(); autoMsg = m['ok'] == true ? 'Ajuste enviado a la pulsera.' : (m['msg']?.toString() ?? 'La pulsera no aceptó el ajuste.'); if (m['ok'] == true) readAutoMeasure();
       case 'heart': if (heart.active) { heart.onEvent(m); } else { live.onEvent(m); }
       case 'log': logs.insert(0, '${m['msg']}'); if (logs.length > 200) logs.removeLast();
     }
@@ -343,7 +345,13 @@ class VigorRepo extends ChangeNotifier {
     }
   }
   Future<void> readAutoMeasure() => _try('No se pudo leer el ajuste.', () => _m.invokeMethod('readAutoMeasure'));
-  Future<void> setAutoMeasure(int type, bool on, {int? interval}) { autoMsg = null; return _m.invokeMethod('setAutoMeasure', {'type': type, 'on': on, 'interval': interval}); }
+  /// Tiempo máximo de espera de la respuesta de la pulsera al ajustar la cadencia.
+  Duration autoMeasureTimeout = const Duration(seconds: 8); Timer? _autoMeasureTimer;
+  Future<void> setAutoMeasure(int type, bool on, {int? interval}) async {
+    autoMsg = null; _autoMeasureTimer?.cancel();
+    if (!await _try('No se pudo enviar el ajuste.', () => _m.invokeMethod('setAutoMeasure', {'type': type, 'on': on, 'interval': interval}))) return;
+    _autoMeasureTimer = Timer(autoMeasureTimeout, () { if (autoMsg == null && !_disposed) { autoMsg = 'La pulsera no respondió.'; notifyListeners(); } });
+  }
   Future<void> stopSport() { sportActive = false; workout.end(); notifyListeners(); return _try('No se pudo detener la actividad.', () => _m.invokeMethod('stopSport')); }
   /// Xiaomi/MIUI: ¿existe la pantalla de «Inicio automático»? (sin ella el sistema no arranca la app cerrada para sincronizar)
   Future<bool> autostartSupported() async { try { return (await _m.invokeMethod<bool>('autostartSupported')) ?? false; } catch (_) { return false; } }

@@ -177,3 +177,20 @@ class RoutePainter extends CustomPainter {
   @override
   bool shouldRepaint(RoutePainter o) => o.pts != pts;
 }
+
+/// Una frase corta de aviso (fallo de sincronización o de una acción) con ⓘ para el detalle. Vacío si no hay nada que decir.
+class StatusLine extends StatelessWidget {
+  final String? syncError, notice; const StatusLine({super.key, this.syncError, this.notice});
+  @override
+  Widget build(BuildContext context) {
+    final t = syncError ?? notice;
+    if (t == null) return const SizedBox.shrink();
+    final c = VC.of(context);
+    final detail = syncError != null
+        ? 'La última sincronización no terminó. Vigor lo vuelve a intentar solo; también puedes pulsar «Sincronizar». Acerca la pulsera al móvil y comprueba que no la use otra app.'
+        : 'La acción no se pudo completar. Comprueba que la pulsera está conectada e inténtalo de nuevo.';
+    return Semantics(liveRegion: true, child: Row(children: [
+      Flexible(child: Text(t, style: VT.caption(c).copyWith(color: c.danger))),
+      InfoButton('Aviso', detail)]));
+  }
+}

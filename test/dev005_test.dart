@@ -115,6 +115,7 @@ void main() {
       expect(find.text('SpO₂'), findsOneWidget);
       await t.tap(find.text('60 min')); await t.pump();
       expect(calls.last.method, 'setAutoMeasure'); expect(calls.last.arguments, {'type': 4, 'on': true, 'interval': 60});
+      r.dispose();
     });
     testWidgets('no soportado: aviso honesto', (t) async {
       bm.setMockMethodCallHandler(_mc, (c) async => null);
