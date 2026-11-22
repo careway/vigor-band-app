@@ -444,6 +444,7 @@ object BandClient {
         try {
             mgr.readSportModelState(noop, object : ISportModelStateListener {
                 override fun onSportModelStateChange(d: SportModelStateData) {
+                    android.util.Log.i("VigorResume", "estado=${d.deviceStauts.name} tipo=${d.sportModeType}")
                     if (!ActivityResume.shouldResume(d.deviceStauts.name, d.sportModeType)) return
                     val t = ESportType.values().firstOrNull { it.value == d.sportModeType && it != ESportType.NONE } ?: return
                     log("actividad en curso en la pulsera: ${t.name}; se retoma el seguimiento")
