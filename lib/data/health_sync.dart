@@ -295,6 +295,7 @@ class HealthSync extends ChangeNotifier {
   /// Borra de Health Connect / Salud lo que Vigor envió de esos registros y limpia el libro. Nunca lanza.
   /// [days]: yyyy-MM-dd (pasos, distancia, calorías, pulso, HRV, pulso en reposo, SpO2, temperatura de ese día).
   Future<HealthDeleteReport> deleteFromHealth({List<Night> nights = const [], List<Session> sessions = const [], List<String> days = const []}) async {
+    await cancelAndWait(); // R3: no tocar el libro mientras run() lo usa
     await _loadLedger();
     final rep = HealthDeleteReport();
     final sleepIds = [for (final n in nights) if (sleepSent(n.date)) n], sesIds = [for (final x in sessions) if (sessionSent(x.key)) x], dayList = [for (final d in days) if (daySent(d)) d];
@@ -327,7 +328,7 @@ class HealthSync extends ChangeNotifier {
   }
 
   /// Tras «Borrar todos mis datos» el libro local ya no existe: el estado interno se reinicia (lo ya enviado a Health Connect/Salud NO se toca).
-  Future<void> afterWipe() async { _ledger = _fresh(); _ledgerLoaded = true; last = null; totalSent = 0; notifyListeners(); }
+  Future<void> afterWipe() async { await cancelAndWait(); _ledger = _fresh(); _ledgerLoaded = true; last = null; totalSent = 0; notifyListeners(); }
 
   /// Borra lo que Vigor escribió (la API solo deja borrar lo propio). Reinicia el libro. Devuelve true si no hubo fallos.
   Future<bool> deleteSent() async {
@@ -352,13 +353,27 @@ class HealthSync extends ChangeNotifier {
   }
 
   /// Envía lo nuevo. No lanza excepciones ni bloquea la UI (cede el turno cada [batch] datos).
-  Future<void> run() async {
-    if (_running || !master || source == null) return;
+  /// Devuelve true solo si la ronda terminó sin error y sin cancelarse (si no exportó nada, false).
+  Future<bool> run() {
+    if (_running || !master || source == null) return Future.value(false);
+    return _inflight = _run();
+  }
+
+  Future<void>? _inflight;
+  /// Cancela un envío en vuelo y espera a que termine (borrados y wipe).
+  Future<void> cancelAndWait() async {
+    final f = _inflight; if (f == null || !_running) return;
+    _cancel = true;
+    try { await f; } catch (_) {}
+  }
+
+  Future<bool> _run() async {
+    var done = false;
     catError.clear(); _running = true; _cancel = false; state = HealthState.running; message = null; lastCount = 0; notifyListeners();
     try {
       await _loadLedger();
       await refreshPermissions();
-      if (avail != HealthAvail.ready || !HealthCat.values.any(effective)) { state = avail != HealthAvail.ready ? HealthState.unavailable : (master ? HealthState.needsPermission : HealthState.off); if (state == HealthState.needsPermission) message ??= 'Faltan permisos en ${gateway.platformName}.'; return; }
+      if (avail != HealthAvail.ready || !HealthCat.values.any(effective)) { state = avail != HealthAvail.ready ? HealthState.unavailable : (master ? HealthState.needsPermission : HealthState.off); if (state == HealthState.needsPermission) message ??= 'Faltan permisos en ${gateway.platformName}.'; return false; }
       final src = source!();
       var errors = 0;
       // Lo poco y valioso va primero (sueño, ejercicios): Health Connect limita las escrituras por hora y,
@@ -396,10 +411,11 @@ class HealthSync extends ChangeNotifier {
       if (lastCount > 0 || errors == 0) { last = clock(); _ledger['last'] = last!.millisecondsSinceEpoch; }
       await _persist();
       if (errors > 0) { state = HealthState.error; message = 'Algunos datos no se pudieron enviar a ${gateway.platformName}; se reintentará en la próxima sincronización.'; }
-      else { state = master ? HealthState.idle : HealthState.off; }
+      else { state = master ? HealthState.idle : HealthState.off; done = !_cancel; }
     } catch (_) {
       state = HealthState.error; message = 'Error inesperado al enviar a ${gateway.platformName}.';
     } finally { _running = false; notifyListeners(); }
+    return done;
   }
 
   Future<int> _sendSleep(HealthSource src) async {

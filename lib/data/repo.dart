@@ -259,8 +259,9 @@ class VigorRepo extends ChangeNotifier {
   }
 
   Future<void> _exportThenClear() async {
-    await health.run();
-    if (health.master && health.state != HealthState.error) { try { await _m.invokeMethod('clearExportDirty'); } catch (_) {} }
+    if (privacyBusy) return;
+    final ok = await health.run();
+    if (ok && health.master && health.state != HealthState.error) { try { await _m.invokeMethod('clearExportDirty'); } catch (_) {} }
   }
 
   @override
@@ -291,7 +292,7 @@ class VigorRepo extends ChangeNotifier {
         if (!syncing) {
           // «Última sincronización» solo cuenta si fue correcta (Kotlin manda ok y la hora).
           if (m['ok'] == true) { final at = (m['at'] as num?)?.toInt(); lastSync = at != null && at > 0 ? DateTime.fromMillisecondsSinceEpoch(at) : clock(); }
-          reload().then((_) { if (health.master) unawaited(_exportThenClear()); }, onError: (_) {});
+          reload().then((_) { if (m['ok'] == true && health.master) unawaited(_exportThenClear()); }, onError: (_) {});
         }
       case 'syncProgress': final pv = m['value']; if (pv is num) progress = pv.toDouble();
       case 'sportLive': { final d = m['data']; if (d is Map) workout.onReport(d); }
@@ -400,6 +401,7 @@ class VigorRepo extends ChangeNotifier {
   Future<bool> wipeData() async {
     privacyBusy = true; privacyMsg = null; notifyListeners();
     try {
+      await health.cancelAndWait(); // R2: ningún envío en vuelo vuelve a guardar datos borrados
       await _m.invokeMethod('wipeData');
       await health.afterWipe();
       days = {}; nights = []; sessions = []; liveSteps = 0; lastSync = null; progress = 0; loadError = null; agps = {};

@@ -51,3 +51,7 @@ Fuera de alcance esta noche (necesitan pulsera o usuario): firma release/`applic
 - **A9 (P0, R2):** `wipeData` debe cancelar y esperar un `run()` en vuelo; `afterWipe` debe activar la cancelación; el envío no debe volver a guardar datos borrados. Test con `run` en vuelo.
 - **A10 (P1, R3/R5):** `deleteFromHealth` respeta `_running`; si el fin de sync llega sin `ok`, no exportar parcial. R4 (reentrada de `reload`) solo si se demuestra con test.
 - Dependen de que termine la ola 2 en `lib/data/repo.dart` (no editar a la vez).
+
+## Estado (2026-11-22, madrugada)
+- Olas 1, 2 y 3 hechas y subidas (R1, R2, R3 y R5 de QA_005 arreglados; R4 sin demostrar, descartado). Analisis limpio y 553 tests verdes.
+- Pendiente: D3 (manual de usuario); test de wipeData/_exportThenClear a nivel de VigorRepo (hace falta poder inyectar la pasarela de Health Connect); todo lo que requiere pulsera sigue SIN verificar.
