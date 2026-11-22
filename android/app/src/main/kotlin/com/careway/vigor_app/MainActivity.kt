@@ -33,10 +33,29 @@ class MainActivity : FlutterFragmentActivity() {
     private val prefs get() = getSharedPreferences("vigor", MODE_PRIVATE)
 
     private var btPending: MethodChannel.Result? = null
+    /**
+     * Tras encender el Bluetooth (por el dialogo o a mano) el adaptador pasa por «encendiendo» y, aun en «encendido», el GATT tarda un instante en estar
+     * listo: conectar entonces deja la pulsera a medias. Se espera a «encendido» (max. 6 s) y se anade 1,2 s de margen antes de devolver true.
+     */
+    private fun waitBtReady(ad: android.bluetooth.BluetoothAdapter, r: MethodChannel.Result) {
+        var left = 30
+        val h = android.os.Handler(android.os.Looper.getMainLooper())
+        val tick = object : Runnable { override fun run() {
+            if (ad.isEnabled) h.postDelayed({ try { r.success(true) } catch (_: Throwable) {} }, 1200)
+            else if (--left <= 0 || ad.state == android.bluetooth.BluetoothAdapter.STATE_OFF && left < 25) { try { r.success(false) } catch (_: Throwable) {} }
+            else h.postDelayed(this, 200)
+        } }
+        h.postDelayed(tick, 200)
+    }
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 78) { val r = btPending; btPending = null; try { r?.success(resultCode == android.app.Activity.RESULT_OK) } catch (_: Throwable) {} }
+        if (requestCode == 78) {
+            val r = btPending; btPending = null
+            val ad = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+            if (r == null) return
+            if (resultCode == android.app.Activity.RESULT_OK && ad != null) waitBtReady(ad, r) else try { r.success(false) } catch (_: Throwable) {}
+        }
     }
 
     override fun onRequestPermissionsResult(rc: Int, perms: Array<out String>, res: IntArray) {
@@ -94,6 +113,7 @@ class MainActivity : FlutterFragmentActivity() {
                         val ad = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
                         if (ad == null) result.success(false)
                         else if (ad.isEnabled) result.success(true)
+                        else if (ad.state == android.bluetooth.BluetoothAdapter.STATE_TURNING_ON) waitBtReady(ad, result)
                         else if (btPending != null) result.success(false)
                         else {
                             btPending = result

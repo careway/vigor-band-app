@@ -189,3 +189,4 @@ Leyenda: **código** = implementado; **test** = cubierto por test automático (s
 
 - 111 Compartir pulso como sensor Bluetooth estandar (0x180D) durante una actividad (opcional, desactivado por defecto; HeartRateBroadcaster). Implementado, probado solo el interruptor en el Mi 9; NO probado que Strava lo vea ni con la pulsera en actividad.
 - 112 Al pulsar Conectar/Buscar con el Bluetooth apagado, el sistema pide activarlo (ensureBluetooth). Probado en el Mi 9: sale el dialogo y, al aceptar, conecta.
+- 113 Espera a que el Bluetooth termine de encender (y 1,2 s de margen) antes de conectar; evita pedir activarlo estando ya encendido. Compila y tests verdes; NO probado en el movil. La causa de la pulsera que no conectaba tras el dialogo no esta demostrada (faltan registros).
