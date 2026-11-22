@@ -189,8 +189,8 @@ class _MeasurementsPageState extends State<MeasurementsPage> {
   Future<void> _toggleExp(BuildContext context, bool v) async {
     if (!v) { await r.setExperimental(false); return; }
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Métricas experimentales'),
-      content: const Text('La FDA (21‑02‑2024) no ha autorizado ningún reloj ni anillo para medir la glucosa sin pinchar la piel y recomienda no usarlos: un valor erróneo puede llevar a errores de medicación. Para los componentes sanguíneos no hay validación en muñeca. Son estimaciones del fabricante, sin rangos ni interpretación. No las uses para decidir medicación ni tratamientos.'),
+      title: infoTitle('Métricas experimentales', 'La FDA (21‑02‑2024) no ha autorizado ningún reloj ni anillo para medir la glucosa sin pinchar la piel y recomienda no usarlos: un valor erróneo puede llevar a errores de medicación. Para los componentes sanguíneos no hay validación en muñeca. Son estimaciones del fabricante, sin rangos ni interpretación. No las uses para decidir medicación ni tratamientos.'),
+      content: const Text('Estimaciones sin validar. No sirven para decidir medicación.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Entiendo, activar'))]));
     if (ok == true) await r.setExperimental(true);
   }
@@ -275,9 +275,8 @@ class _PrivacyPanelState extends State<PrivacyPanel> {
 
   Future<void> _wipe(BuildContext context) async {
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Borrar todos mis datos'),
-      content: const Text('Se borrarán de este móvil todos los datos de la pulsera que guarda Vigor (pulso, SpO₂, variabilidad, sueño, actividades y rutas), las efemérides descargadas y la copia temporal de exportación (no las copias que ya hayas guardado o enviado fuera de Vigor, ni lo escrito en Health Connect / Apple Salud). '
-          'No se borra nada de la pulsera ni de otras apps, y se conservan el emparejamiento, tu edad y tu meta de pasos. No se puede deshacer.'),
+      title: infoTitle('Borrar todos mis datos', 'Se borrarán de este móvil todos los datos de la pulsera que guarda Vigor (pulso, SpO₂, variabilidad, sueño, actividades y rutas), las efemérides descargadas y la copia temporal de exportación (no las copias que ya hayas guardado o enviado fuera de Vigor, ni lo escrito en Health Connect / Apple Salud). No se borra nada de la pulsera ni de otras apps, y se conservan el emparejamiento, tu edad y tu meta de pasos. No se puede deshacer.'),
+      content: const Text('Se borran los datos de este móvil. No se puede deshacer.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Borrar todo'))]));
     if (ok == true) await repo.wipeData();
   }

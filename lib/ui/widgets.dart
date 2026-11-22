@@ -66,6 +66,9 @@ class InfoButton extends StatelessWidget {
         onPressed: () => showInfoSheet(context, title, text));
 }
 
+/// Título de diálogo con ⓘ: el diálogo queda corto y el detalle va en la hoja.
+Widget infoTitle(String title, String text) => Row(children: [Expanded(child: Text(title)), InfoButton(title, text)]);
+
 Future<void> showInfoSheet(BuildContext context, String title, String text) => showModalBottomSheet<void>(
     context: context, isScrollControlled: true, showDragHandle: true,
     builder: (ctx) { final c = VC.of(ctx); return SafeArea(child: ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * .8), child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(Sp.x4, 0, Sp.x4, Sp.x4), children: [

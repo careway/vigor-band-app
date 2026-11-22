@@ -1,5 +1,27 @@
 # Estado del proyecto (actualizado 2026-11-20, ronda 2 del Supervisor; las secciones anteriores son de la sesión inicial)
 
+## Tabla de verificación por funcionalidad (2026-11-22)
+Leyenda: «Implementado» = existe en el código; «Con test» = cubierto por tests automáticos (fakes, reloj simulado o JVM, nunca la pulsera); «Pulsera» = probado con la pulsera real. Lo no comprobado dice «no verificado». La pulsera no tiene pantalla: toda la interfaz está en el móvil.
+
+| Funcionalidad | Implementado | Con test | Probado con pulsera | Fecha y fuente |
+|---|---|---|---|---|
+| Sueño a Health Connect | Sí | Sí (fakes) | Sí | 2026-11-21, prueba del usuario con la pulsera; BACKLOG 74/84 |
+| Sincronización en segundo plano | Sí | Sí | Sí | 2026-11-21, prueba del usuario con la pulsera |
+| Informe en vivo cada 5 s (duración, pulso, estado) | Sí | Sí | Sí | 2026-11-21, prueba del usuario con la pulsera; BACKLOG 108 |
+| Sincronización automática con la app abierta (al conectar, al reanudar, periódica) | Sí | Sí (reloj simulado) | No verificado | BACKLOG 89, `auto_sync.dart` |
+| Reconexión automática con espera creciente (tope 10 min) | Sí | Sí | No verificado: sin caída real provocada | BACKLOG 18, `auto_sync.dart` |
+| Sincronización tras terminar una actividad (6 s y 45 s) | Sí | Sí (`dev022_postworkout_test.dart`) | No verificado | PLAN_NOCHE, 2026-11-22 |
+| Pulso en vivo y medición bajo demanda | Sí | Sí (fakes) | No verificado | BACKLOG 71, 73, 81 |
+| Posición GPS en directo (mapa del entreno) | Sí | Sí (fakes) | No verificado | BACKLOG 106 |
+| Respuesta de ayuda GPS (efemérides) en directo | Sí | Parcial | No verificado (la transferencia de efemérides sí se vio el 2026-11-20) | ESTADO, sección «Verificado» |
+| Modos deportivos distintos de Caminar y Fitness en interior | Sí | Sí (fakes) | No verificado | BACKLOG 101; 2026-11-21 |
+| Pausa y reanudar desde el móvil | Sí | Sí (fakes) | No verificado | 2026-11-21 |
+| Botones de la pulsera | No hay manejo propio | No | No verificado | 2026-11-21 |
+| Borrado de datos (noches, sesiones, días) y exportación | Sí | Sí | No verificado en el móvil real con Health Connect | BACKLOG 82 |
+| Actualizaciones desde la app | Sí | Sí (fakes) | No verificado de extremo a extremo | BACKLOG 70, 80 |
+
+Recuento de tests: ver BACKLOG, nota de la ronda de la noche (2026-11-22).
+
 ## Cómo compilar e instalar
 - Proyecto: `D:\band_app\vigor_app` (desde WSL: `/mnt/d/band_app/vigor_app`).
 - Compilar: `D:\ProgramFiles\flutter\bin\flutter.bat build apk --debug` (desde PowerShell). Tests: `flutter test`.

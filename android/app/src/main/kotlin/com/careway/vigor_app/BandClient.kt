@@ -190,7 +190,7 @@ object BandClient {
         connected = true; connecting = false
         state("connected")
         val cbs = readyCbs; readyCbs = mutableListOf(); cbs.forEach { it(true) }
-        registerLiveSport(); GpsAssist.register(app); DebugTools.startRawCapture()
+        registerLiveSport(); GpsAssist.register(app); DebugTools.startRawCapture(); resumeRunningSport()
         if (debuggable) main.postDelayed({ try { mgr.readCustomSetting(noop, object : ICustomSettingDataListener { override fun OnSettingDataChange(c: CustomSettingData?) { if (c != null) try { logEventFlags("custom", toJson(c)) } catch (_: Throwable) {} } }) } catch (_: Throwable) {} }, 3000) // solo depuracion: estado de los ajustes que disparan eventos
         if (autoSync) main.postDelayed({ syncAll { Agps.onConnected() } }, 1500)
     }
@@ -430,6 +430,24 @@ object BandClient {
     fun pollStart(t: ESportType) { if (pollType == t) return; pollType = t; pollFails = 0; main.removeCallbacks(pollTick); main.postDelayed(pollTick, 2500); try { mgr.setReportGps(noop, true, gpsLiveListener) } catch (_: Throwable) {} }
     fun pollStop() { val was = pollType; pollType = null; main.removeCallbacks(pollTick); if (was != null) { try { mgr.setReportGps(noop, false, gpsLiveListener) } catch (_: Throwable) {} } }
     private fun JSONObject.toMap(): Map<String, Any?> { val o = HashMap<String, Any?>(); val it = keys(); while (it.hasNext()) { val k = it.next(); val v = opt(k); o[k] = if (v == JSONObject.NULL) null else v }; return o }
+    /**
+     * Si la app se cerro (o se perdio la conexion) con una actividad en marcha, la pulsera sigue con ella: al conectar se le pregunta el estado y, si esta
+     * «ocupada», se retoma el sondeo con el tipo que indica. El primer informe hace que la app muestre otra vez la actividad en curso.
+     */
+    private fun resumeRunningSport() {
+        try {
+            mgr.readSportModelState(noop, object : ISportModelStateListener {
+                override fun onSportModelStateChange(d: SportModelStateData) {
+                    if (!ActivityResume.shouldResume(d.deviceStauts.name, d.sportModeType)) return
+                    val t = ESportType.values().firstOrNull { it.value == d.sportModeType && it != ESportType.NONE } ?: return
+                    log("actividad en curso en la pulsera: ${t.name}; se retoma el seguimiento")
+                    main.post { pollStart(t) }
+                }
+                override fun onSportStopped() { }
+            })
+        } catch (_: Throwable) {}
+    }
+
     fun registerLiveSport() { try { mgr.setSportControlReportListener(liveSportListener) } catch (_: Throwable) {} }
 
     fun startSport(type: String) = main.post {

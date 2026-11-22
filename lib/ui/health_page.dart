@@ -66,8 +66,8 @@ class HealthPage extends StatelessWidget {
 
   Future<void> _confirmDelete(BuildContext context, HealthSync h, String p) async {
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: Text('Borrar de $p'),
-      content: Text('Vigor pedirá a $p que borre los datos que Vigor escribió (pasos, pulso, SpO₂, sueño, ejercicios…). Solo se pueden borrar los datos escritos por Vigor, no los de otras apps. Si compartes de nuevo, se volverán a enviar los últimos días. Esta acción no se puede deshacer.'),
+      title: infoTitle('Borrar de $p', 'Vigor pedirá a $p que borre los datos que Vigor escribió (pasos, pulso, SpO₂, sueño, ejercicios…). Solo se pueden borrar los datos escritos por Vigor, no los de otras apps. Si compartes de nuevo, se volverán a enviar los últimos días. Esta acción no se puede deshacer.'),
+      content: Text('Se borra de $p lo que escribió Vigor. No se puede deshacer.'),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Borrar'))]));
     if (ok == true) await h.deleteSent();
   }

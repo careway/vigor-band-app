@@ -65,7 +65,7 @@ void main() {
     await t.scrollUntilVisible(b, 300, scrollable: find.byType(Scrollable).first); expect(b, findsOneWidget);
     expect(t.getSize(b).height, greaterThanOrEqualTo(48));
     await t.tap(b); await t.pumpAndSettle();
-    expect(find.textContaining('no se puede deshacer'), findsOneWidget);
+    expect(find.textContaining('No se puede deshacer'), findsOneWidget);
     await t.tap(find.text('Cancelar')); await t.pumpAndSettle();
     expect(calls.where((c) => c.method == 'deleteRecords'), isEmpty);
     await t.tap(b); await t.pumpAndSettle(); await t.tap(find.text('Borrar')); await t.pumpAndSettle();

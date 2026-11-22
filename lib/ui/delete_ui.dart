@@ -12,9 +12,9 @@ Future<bool> confirmAndDelete(BuildContext context, VigorRepo repo, {required St
   final p = h.gateway.platformName;
   var also = sent;
   final ok = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
-    title: Text(title),
+    title: infoTitle(title, 'Se borra de este móvil y no se puede deshacer. La pulsera puede seguir guardándolo, pero Vigor no volverá a mostrarlo ni a guardarlo al sincronizar.'),
     content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Text('$what\n\nSe borra de este móvil y no se puede deshacer. La pulsera puede seguir guardándolo, pero Vigor no volverá a mostrarlo ni a guardarlo al sincronizar.'),
+      Text('$what\n\nNo se puede deshacer.'),
       if (sent) CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, value: also, onChanged: (v) => set(() => also = v ?? false),
           title: Text('También borrar de $p'), subtitle: const Text('Ya se envió. Solo se puede borrar lo que escribió Vigor.')),
     ])),

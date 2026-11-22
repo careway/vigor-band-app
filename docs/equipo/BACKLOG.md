@@ -1,6 +1,6 @@
 # Backlog (lo mantiene el Supervisor)
 
-Prioridad: P0 = bloquea o es un riesgo; P1 = alto valor; P2 = mejora. Estado: pendiente · en curso · parcial · hecho. «Hecho» significa implementado según `DEV_001.md`; entre paréntesis lo que **no** está verificado. Actualizado en la ronda 2 (2026-11-20). QA_002 puede cambiar estados.
+Prioridad: P0 = bloquea o es un riesgo; P1 = alto valor; P2 = mejora. Estado: pendiente · en curso · parcial · hecho. «Hecho» significa implementado según `DEV_001.md`; entre paréntesis lo que **no** está verificado. Actualizado en la ronda 2 (2026-11-20). QA_002 puede cambiar estados. Recuento de tests Flutter (`flutter test`, 2026-11-22, con otros agentes añadiendo tests): última ejecución completa +517 -12 = 529 (12 fallos, en `dev019_workout_test.dart`, `dev024_ui_text_test.dart` y otros ficheros en edición concurrente); una anterior dio +475 -10. El número cambia entre ejecuciones; no es una cifra cerrada.
 
 ## Heredado de `ESTADO.md`
 | # | Prioridad | Tarea | Responsable | Estado |
@@ -26,7 +26,7 @@ Prioridad: P0 = bloquea o es un riesgo; P1 = alto valor; P2 = mejora. Estado: pe
 | 15 | P1 | Documentar filtros de plausibilidad, uso de `baselineOf` y RMSSD; mostrar lecturas descartadas (H-07, H-13) | Investigador cardio + Supervisor | parcial (documentado en `ANALISIS.md` §14 en la ronda 2; falta la UI de «lecturas descartadas» → E1) |
 | 16 | P1 | Accesibilidad real: Semantics, alternativa al Reloj del día, texto 200 %, TalkBack, contraste (H-24) | Desarrollador + QA | parcial (Semantics en teselas/cinta/cifras/gráficos; reloj ajustable + tabla por franjas; NO probados TalkBack, 200 %, contraste; Semantics en Actividad/Sueño/Dispositivo no declarado) |
 | 17 | P1 | Validar unidades de glucosa, `calValue` y `bloodComponent` frente a la app oficial (H-08) | Investigador cardio | parcial (verificadas con la app oficial: distancia en m, calorías de sesión, ritmo en s/km; pendientes glucosa, `calValue`, `bloodComponent`, velocidad, cadencia) |
-| 18 | P1 | Reconexión automática y aviso de sincronización parcial/errores (H-19, H-20) | Desarrollador | parcial (listener de desconexión que aborta la sincronización y emite `disconnected`; sin reconexión automática; caída real no provocada) |
+| 18 | P1 | Reconexión automática y aviso de sincronización parcial/errores (H-19, H-20) | Desarrollador | parcial (listener de desconexión que aborta la sincronización y emite `disconnected`; reconexión automática con espera creciente, tope 10 min, en `auto_sync.dart` con tests; NO probada con una caída real; sin aviso de sincronización parcial) |
 | 19 | P1 | Interpretar los paquetes de funciones soportadas y adaptar la UI (4.1) | Investigador movimiento + Desarrollador | pendiente (DEV_001 solo los redujo a resúmenes en el log) |
 | 20 | P1 | Revisar estudios 2020-2026 por sensor; sustituir fuentes secundarias (H-28) | Investigador cardio + Investigador movimiento | parcial (CARDIO.md y MOVIMIENTO hechos, casi todo a nivel de resumen; en la ronda 2 se leyeron FDA, Shaffer, Yeh; queda Wikipedia en MET y abrir textos completos: ver 36) |
 | 21 | P2 | Cargar `half.json` como respaldo; evaluar presión arterial sin mostrarla | Investigador cardio | pendiente (presión: 2/89 registros y sin validación → descartar) |

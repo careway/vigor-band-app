@@ -194,13 +194,13 @@ void main() {
       await done(t, r);
     });
     testWidgets('en un entreno de recorrido hay tarjeta de posición; sin posición pide esperar; con ella, la incertidumbre y el botón de actualizar', (t) async {
-      final r = VigorRepo(); r.mapOn = false; r.conn = 'connected'; r.clock = () => fake; r.workout.begin(sportByKey('OUTDOOR_WALK')); r.workout.onReport(_rep(type: 2, gps: 0));
+      final r = VigorRepo(); r.postWorkoutSyncDelays = const []; r.mapOn = false; r.conn = 'connected'; r.clock = () => fake; r.workout.begin(sportByKey('OUTDOOR_WALK')); r.workout.onReport(_rep(type: 2, gps: 0));
       await pump(t, WorkoutPage(r), size: const Size(360, 1800)); expect(find.text('Posición'), findsOneWidget); expect(find.textContaining('Esperando la posición'), findsOneWidget);
       r.workout.onReport(_rep(type: 2, gps: 2)); await t.pump(); expect(find.textContaining('ya tiene señal'), findsOneWidget);
       r.workout.setTrack([for (var i = 0; i < 20; i++) GpsFix(40.0, -3.0 + i * 0.0001, i * 5, 2)]); await t.pump();
       expect(find.textContaining('Incertidumbre aprox. ±'), findsOneWidget);
       await t.tap(find.text('Actualizar posición')); await t.pump(); expect(calls.any((c) => c.method == 'sync'), true);
-      await done(t, r);
+      await done(t, r); r.dispose(); // cancela el temporizador de seguridad de la sincronizacion
     });
     testWidgets('en un entreno sin GPS (gimnasio) no hay tarjeta de posición', (t) async {
       final r = VigorRepo(); r.clock = () => fake; r.workout.begin(sportByKey('FITNESS')); r.workout.onReport(_rep(type: null));
@@ -214,7 +214,7 @@ void main() {
       await done(t, r);
     });
     testWidgets('terminar pide confirmación y, con la pulsera conectada, envía la orden de parar', (t) async {
-      final r = running(); r.conn = 'connected'; await pump(t, WorkoutPage(r), size: const Size(360, 1400));
+      final r = running(); r.conn = 'connected'; r.postWorkoutSyncDelays = const []; await pump(t, WorkoutPage(r), size: const Size(360, 1400));
       await t.tap(find.text('Terminar')); await t.pumpAndSettle(); expect(find.text('¿Terminar la actividad?'), findsOneWidget);
       await t.tap(find.text('Seguir')); await t.pumpAndSettle(); expect(r.workout.active, true);
       await t.tap(find.text('Terminar')); await t.pumpAndSettle(); await t.tap(find.widgetWithText(FilledButton, 'Terminar').last); await t.pumpAndSettle();

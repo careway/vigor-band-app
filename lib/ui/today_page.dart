@@ -36,10 +36,12 @@ class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final c = VC.of(context); final r = widget.repo; final keys = r.dayKeys;
     if (keys.isEmpty) {
-      return EmptyState(Icons.watch_outlined, r.conn == 'connected' ? 'Sincronizando… aún no hay datos guardados.' : 'Conecta la pulsera para ver tus datos.',
+      final busy = r.syncing || r.conn == 'connecting' || r.conn == 'scanning';
+      final on = r.conn == 'connected';
+      return EmptyState(Icons.watch_outlined, r.syncing ? 'Sincronizando…' : on ? 'Aún no hay datos.' : 'Sin conexión.',
           action: FilledButton(
-              onPressed: r.conn == 'connected' ? r.sync : (r.savedMac != null ? r.connectSaved : () => showFindBandSheet(context, r)),
-              child: Text(r.conn == 'connected' ? 'Sincronizar' : (r.savedMac != null ? 'Conectar' : 'Buscar pulsera'))));
+              onPressed: busy ? null : on ? r.sync : (r.savedMac != null ? r.connectSaved : () => showFindBandSheet(context, r)),
+              child: Text(r.syncing ? 'Sincronizando…' : r.conn == 'connecting' ? 'Conectando…' : r.conn == 'scanning' ? 'Buscando…' : on ? 'Sincronizar' : (r.savedMac != null ? 'Conectar' : 'Buscar pulsera'))));
     }
     final k = (key != null && keys.contains(key)) ? key! : keys.last;
     final d = r.days[k]!; final isLast = k == keys.last;

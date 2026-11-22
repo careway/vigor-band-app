@@ -25,6 +25,12 @@ void main() {
     final r = repo(); r.conn = 'disconnected'; await r.startSport('OUTDOOR_WALK'); await r.stopSport();
     await Future<void>.delayed(const Duration(milliseconds: 1300)); expect(syncs(), 0);
   });
+  test('si termina sin conexion, sincroniza al reconectar', () async {
+    final r = repo(); await r.startSport('OUTDOOR_WALK'); r.conn = 'disconnected'; await r.stopSport();
+    await Future<void>.delayed(const Duration(milliseconds: 100)); expect(syncs(), 0);
+    r.debugHandle({'type': 'state', 'value': 'connected'}); await Future<void>.delayed(const Duration(milliseconds: 100)); expect(syncs(), 1);
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+  });
   test('si la termina la pulsera (informe de parada) tambien sincroniza', () async {
     final r = repo(); await r.startSport('OUTDOOR_WALK');
     r.workout.onReport({'runState': 'FINISHED', 'opCode': 'STOP'});
