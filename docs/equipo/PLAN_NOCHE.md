@@ -76,3 +76,7 @@ Revisados BandClient.kt (syncAll/stage/runSessionBlocking/poll), SyncWorker.kt, 
 - E1 (cronometro del entreno sin anuncio continuo y sin redibujar el mapa cada segundo) y E2 (JsonStore: no se pierden datos si falla una lectura, la sincronizacion no se da por buena si falla el volcado, orden de escrituras) hechos. Analisis limpio, 560 tests Dart y 81 Kotlin verdes. Sin probar en el movil ni con la pulsera.
 - E2 cambia renameTo por Files.move atomico en JsonStore: comprobar en el movil en la proxima sesion con adb que la sincronizacion sigue guardando.
 - Sin asignar (P2): LiveWorkout.track crece sin tope; solo si un test de 4 h sintetico lo demuestra.
+
+## Ronda 05:00
+- P2 (ruta de un entreno largo) medido con un test sintetico de 4 h (2880 puntos): peor punto 4,7 ms en el PC, 3,5 s en total. No se cambia nada; queda el test test/dev031 como proteccion. En el movil sera mas lento (sin medir).
+- Sin mas trabajo valioso detectado sin pulsera ni usuario: no se inventa mas. Lo pendiente depende de la pulsera (ver docs/ESTADO.md).
