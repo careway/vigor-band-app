@@ -144,7 +144,24 @@ class VigorRepo extends ChangeNotifier {
   /// true entre pedir un deporte y detenerlo/desconectar (conservador: durante él no se mide el pulso en vivo).
   bool sportActive = false;
   /// Actividad en curso (iniciada desde la app o desde la pulsera) con sus datos en vivo.
-  late final LiveWorkout workout = LiveWorkout(clock: () => clock())..addListener(() { if (workout.active != sportActive) { sportActive = workout.active; notifyListeners(); } });
+  late final LiveWorkout workout = LiveWorkout(clock: () => clock())..addListener(() {
+    if (_workoutWasActive && !workout.active) _syncAfterWorkout();
+    if (workout.active) { for (final t in _postWorkoutTimers) { t.cancel(); } _postWorkoutTimers.clear(); }
+    _workoutWasActive = workout.active;
+    if (workout.active != sportActive) { sportActive = workout.active; notifyListeners(); }
+  });
+  bool _workoutWasActive = false;
+  /// Esperas (s) tras terminar una actividad antes de sincronizar: la pulsera tarda en guardarla; la segunda es el reintento por si aun no estaba.
+  List<int> postWorkoutSyncDelays = const [6, 45];
+  final List<Timer> _postWorkoutTimers = [];
+  /// Al terminar una actividad (desde la app o la pulsera) se sincroniza solo, para que aparezca en el historial sin pulsar nada.
+  void _syncAfterWorkout() {
+    for (final t in _postWorkoutTimers) { t.cancel(); }
+    _postWorkoutTimers.clear();
+    for (final d in postWorkoutSyncDelays) {
+      _postWorkoutTimers.add(Timer(Duration(seconds: d), () { if (conn == 'connected' && !syncing && !sportActive) unawaited(sync().catchError((_) {})); }));
+    }
+  }
   bool liveOn = true; int liveSec = 10;
   /// Mapa de fondo de OpenStreetMap en las rutas (descarga teselas de openstreetmap.org; apagado = solo la ruta dibujada).
   bool mapOn = true;
